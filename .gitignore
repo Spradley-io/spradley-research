@@ -3,6 +3,9 @@ keys.env
 .env
 *.env
 
+# Interview data — not for public repos
+pilot_transcripts.csv
+
 # Virtual environment
 .venv/
 venv/
