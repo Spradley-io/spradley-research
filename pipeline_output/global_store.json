@@ -1,0 +1,194 @@
+{
+  "l3_codes": [
+    {
+      "code": "positive team dynamics and support",
+      "merged_from_l2": [
+        "positive team dynamics",
+        "peer support and collaboration",
+        "peer and team support",
+        "collaborative decision-making"
+      ]
+    },
+    {
+      "code": "workplace culture and belonging",
+      "merged_from_l2": [
+        "workplace culture and belonging",
+        "organizational presence and recognition",
+        "organizational integration and growth"
+      ]
+    },
+    {
+      "code": "work-life balance and flexibility",
+      "merged_from_l2": [
+        "work-life boundary maintenance",
+        "work-life balance",
+        "work-life balance and flexibility",
+        "work flexibility and variability"
+      ]
+    },
+    {
+      "code": "emotional and psychological benefits",
+      "merged_from_l2": [
+        "emotional and mood benefits",
+        "work as stress relief",
+        "self-validation and accomplishment"
+      ]
+    },
+    {
+      "code": "job satisfaction and enjoyment",
+      "merged_from_l2": [
+        "job satisfaction and timeline impact",
+        "job satisfaction and enjoyment",
+        "work completion and fulfillment"
+      ]
+    },
+    {
+      "code": "customer and user motivation",
+      "merged_from_l2": [
+        "customer satisfaction motivation",
+        "user-centered design approach"
+      ]
+    },
+    {
+      "code": "stress and pressure management",
+      "merged_from_l2": [
+        "stress and pressure management",
+        "case-by-case coping strategies",
+        "coping strategies clarity",
+        "adaptive stress management"
+      ]
+    },
+    {
+      "code": "skill development and learning",
+      "merged_from_l2": [
+        "learning through experience",
+        "skill development progression",
+        "transferable skills",
+        "continued professional development"
+      ]
+    },
+    {
+      "code": "confidence and problem-solving capability",
+      "merged_from_l2": [
+        "confidence building",
+        "self-directed problem solving",
+        "problem-solving confidence"
+      ]
+    },
+    {
+      "code": "task motivation and challenge",
+      "merged_from_l2": [
+        "challenging assignments",
+        "complexity as motivator",
+        "motivating task assignments",
+        "task focus and repetition"
+      ]
+    },
+    {
+      "code": "technical work and design projects",
+      "merged_from_l2": [
+        "anticipated technical work",
+        "UI/UX and design projects"
+      ]
+    },
+    {
+      "code": "career growth and readiness",
+      "merged_from_l2": [
+        "modest career impact",
+        "career growth readiness",
+        "career development opportunities",
+        "future orientation and optimism"
+      ]
+    },
+    {
+      "code": "organizational change and direction",
+      "merged_from_l2": [
+        "organizational change exposure",
+        "positive organizational direction",
+        "organizational growth optimism",
+        "business expansion strategy"
+      ]
+    },
+    {
+      "code": "recognition and feedback",
+      "merged_from_l2": [
+        "managerial recognition and feedback",
+        "cross-functional visibility"
+      ]
+    },
+    {
+      "code": "work organization and productivity",
+      "merged_from_l2": [
+        "time organization and prioritization",
+        "focus and concentration management",
+        "productivity and completion perception",
+        "workplace organization and environment"
+      ]
+    },
+    {
+      "code": "workflow challenges and dependencies",
+      "merged_from_l2": [
+        "task interruption and context switching",
+        "workflow blockers and dependencies"
+      ]
+    },
+    {
+      "code": "workload management",
+      "merged_from_l2": [
+        "balanced workload management",
+        "capacity and limits uncertainty"
+      ]
+    },
+    {
+      "code": "proactive work initiative",
+      "merged_from_l2": [
+        "proactive work initiative",
+        "operational continuity commitment"
+      ]
+    },
+    {
+      "code": "continuous improvement orientation",
+      "merged_from_l2": [
+        "continuous improvement orientation"
+      ]
+    },
+    {
+      "code": "performance quality standards",
+      "merged_from_l2": [
+        "performance quality standards",
+        "team performance outcomes"
+      ]
+    },
+    {
+      "code": "brand development potential",
+      "merged_from_l2": [
+        "brand development potential"
+      ]
+    },
+    {
+      "code": "impact measurement uncertainty",
+      "merged_from_l2": [
+        "impact measurement uncertainty",
+        "user feedback absence"
+      ]
+    },
+    {
+      "code": "employment status limitations",
+      "merged_from_l2": [
+        "employment status limitations"
+      ]
+    },
+    {
+      "code": "cognitive awareness and biases",
+      "merged_from_l2": [
+        "cognitive awareness and biases"
+      ]
+    },
+    {
+      "code": "future optimism and anticipation",
+      "merged_from_l2": [
+        "future optimism and anticipation"
+      ]
+    }
+  ]
+}
