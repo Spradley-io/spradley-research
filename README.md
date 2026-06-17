@@ -2,7 +2,7 @@
 
 Automated open coding of employee interviews using an LLM, following grounded theory principles. Raw transcripts go in; thematic clusters with full source lineage come out.
 
-![Pipeline overview](Coding_Pipeline_Architecture_simple.svg)
+![Pipeline overview](assets/Coding_Pipeline_Architecture_simple.svg)
 
 ---
 
@@ -12,11 +12,11 @@ The pipeline processes interview transcripts in four stages:
 
 **1. Ingest & anonymise** — Transcripts are loaded from a CSV, paired into question–answer turns, and scrubbed of PII (names, emails, phone numbers) before anything is stored.
 
-**2. Open coding (L1 → L2 → L3)** — The LLM reads each Q&A pair and generates 1–10 inductive codes grounded in the employee's exact words (L1). These are then consolidated per interview into 20–30 broader codes (L2), and finally merged across all interviews into 40–80 global codes (L3). Every merge step records which source codes it absorbed, keeping the lineage intact.
+**2. Open coding (L1 → L2 → L3)** — The LLM reads each Q&A pair and generates 1–10 inductive codes grounded in the employee's exact words (L1). These are consolidated per interview into 20–30 broader codes (L2), then merged across all interviews into 40–80 global codes (L3). Every merge step records which source codes it absorbed, keeping the lineage intact.
 
-**3. Theme clustering** — The L3 codes are grouped into 7–12 named thematic clusters. Each cluster is assigned a narrative story written by the LLM, grounded in the original Q&A pairs that fed into it.
+**3. Theme clustering** — L3 codes are grouped into 7–12 named thematic clusters, each accompanied by a narrative written by the LLM and grounded in the original Q&A pairs.
 
-**4. Persist** — All data structures are written to `pipeline_output/` as JSON, including the full lineage chain from cluster name down to the original interview question ID.
+**4. Persist** — All data structures are written to `pipeline_output/` as JSON, including the full lineage chain from cluster name down to individual interview question IDs.
 
 | Coding level | Scope | Range |
 |---|---|---|
@@ -29,9 +29,9 @@ The pipeline processes interview transcripts in four stages:
 
 ## Architecture
 
-![Technical architecture](Coding_Pipeline_Architecture.svg)
+![Technical architecture](assets/Coding_Pipeline_Architecture.svg)
 
-Each box in the diagram corresponds to a single notebook cell (C0–C12), keeping stages independently re-runnable. State is held in Python dicts (`db`, `interview_store`, `global_store`, `lineage`, `clusters`) and persisted to JSON after each run.
+Each box corresponds to a single notebook cell (C0–C12), keeping stages independently re-runnable. State is held in Python dicts and persisted to JSON after each run.
 
 ---
 
@@ -39,12 +39,12 @@ Each box in the diagram corresponds to a single notebook cell (C0–C12), keepin
 
 ```bash
 python -m venv .venv
-.venv\Scripts\activate
+.venv\Scripts\activate        # Windows
 pip install -r requirements.txt
 python -m ipykernel install --user --name=spreadley-venv --display-name "Python (Spreadley)"
 ```
 
-Create `keys.env` in this directory (never committed):
+Create `keys.env` in the project root (never committed):
 
 ```
 ANTHROPIC_API_KEY=sk-ant-...
@@ -54,7 +54,7 @@ ANTHROPIC_API_KEY=sk-ant-...
 
 ## Running
 
-Open `Coding_Pipeline.ipynb` and run cells **C0 → C12** in order. Each cell is self-contained; re-run any stage independently after adjusting config in C0.
+Open `Coding_Pipeline.ipynb`, select the **Python (Spreadley)** kernel, and run cells **C0 → C12** in order. Each cell is self-contained and can be re-run independently after adjusting config in C0.
 
 ### Output files
 
