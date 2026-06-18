@@ -54,7 +54,7 @@ ANTHROPIC_API_KEY=sk-ant-...
 
 ## Running
 
-Open `Coding_Pipeline.ipynb`, select the **Python (Spradley)** kernel, and run cells **C0 → C13** in order. Each cell is self-contained and can be re-run independently after adjusting config in C0.
+Open `Pipeline_Execution.ipynb`, select the **Python (Spradley)** kernel, and run cells **C0 → C13** in order. Each cell is self-contained and can be re-run independently after adjusting config in C0.
 
 ### Output files
 
@@ -72,4 +72,10 @@ Open `Coding_Pipeline.ipynb`, select the **Python (Spradley)** kernel, and run c
 
 ## Swapping the LLM
 
-Change `LLM_PROVIDER` and `LLM_MODEL` in cell **C0**, then uncomment the matching branch in cell **C2**. No other cells need to change.
+Change `LLM_PROVIDER` and `LLM_MODEL` in cell **C0**. The client implementation lives in `pipeline_core.py` (search `# C2`); uncomment the alternative provider branch there. No notebook cells need to change.
+
+---
+
+## Evaluating the pipeline
+
+Open `Pipeline_Evals.ipynb` and run all cells. It reads from `pipeline_output/` (no re-runs of the main pipeline needed) and writes `pipeline_output/eval_report.html`.
