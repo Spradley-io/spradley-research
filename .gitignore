@@ -6,6 +6,9 @@ keys.env
 # Interview data — not for public repos
 pilot_transcripts.csv
 
+# Pipeline data outputs — JSON files can be large; commit selectively
+pipeline_output/*.json
+
 # Virtual environment
 .venv/
 venv/
