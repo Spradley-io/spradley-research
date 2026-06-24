@@ -10,6 +10,7 @@ import re
 import json
 import os
 import html as _html_mod
+import datetime
 
 # ── Fixed paths ───────────────────────────────────────────────────────────────
 CSV_PATH   = "pilot_transcripts.csv"
@@ -21,7 +22,6 @@ CONFIG = {
     "LLM_PROVIDER":    "anthropic",
     "LLM_MODEL":       "claude-haiku-4-5-20251001",
     "LLM_TEMPERATURE": 0.2,
-    "L1_CODES_RANGE":  (1, 10),
     "L2_CODES_RANGE":  (20, 30),
     "L3_CODES_RANGE":  (40, 80),
     "CLUSTERS_RANGE":  (7, 12),
@@ -33,6 +33,7 @@ CONFIG = {
 def call_llm(prompt: str, system: str = "You are a qualitative research assistant.",
              model: str | None = None, temperature: float | None = None) -> str:
     """Single LLM call. Uses CONFIG by default; override model/temperature for eval judges."""
+    import time
     _model       = model       or CONFIG["LLM_MODEL"]
     _temperature = temperature if temperature is not None else CONFIG["LLM_TEMPERATURE"]
     provider     = CONFIG["LLM_PROVIDER"]
@@ -42,13 +43,28 @@ def call_llm(prompt: str, system: str = "You are a qualitative research assistan
         client = anthropic.Anthropic(
             http_client=httpx.Client(verify=False, trust_env=False)
         )
-        resp = client.messages.create(
-            model=_model, max_tokens=2048,
-            temperature=_temperature,
-            system=system,
-            messages=[{"role": "user", "content": prompt}]
-        )
-        return resp.content[0].text
+        for attempt in range(5):
+            try:
+                resp = client.messages.create(
+                    model=_model, max_tokens=2048,
+                    temperature=_temperature,
+                    system=system,
+                    messages=[{"role": "user", "content": prompt}]
+                )
+                return resp.content[0].text
+            except anthropic.RateLimitError:
+                if attempt == 4:
+                    raise
+                wait = 2 ** attempt * 5
+                print(f"  [rate limit] retrying in {wait}s...")
+                time.sleep(wait)
+            except anthropic.APIStatusError as e:
+                if e.status_code == 529 and attempt < 4:
+                    wait = 2 ** attempt * 5
+                    print(f"  [overloaded] retrying in {wait}s...")
+                    time.sleep(wait)
+                else:
+                    raise
     # elif provider == "openai":
     #     import openai, httpx
     #     client = openai.OpenAI(http_client=httpx.Client(verify=False, trust_env=False))
@@ -117,7 +133,7 @@ def anonymize(text: str) -> str:
     return text
 
 
-# ── C5/C6: DB init + L1 Coder ─────────────────────────────────────────────────
+# ── C5: DB init ──────────────────────────────────────────────────────────────
 
 def parse_json_safe(text: str) -> dict:
     text = text.strip()
@@ -128,76 +144,77 @@ def parse_json_safe(text: str) -> dict:
             text = text[:-3].strip()
     return json.loads(text)
 
-PROMPT_CODER = (
-    "You are a qualitative researcher performing open coding of employee interview responses.\n"
-    "Generate between {l1_min} and {l1_max} short open codes (2-5 word noun phrases) that\n"
-    "capture the key conceptual ideas in the answer. Be specific and grounded in the text.\n\n"
+
+# ── C6: L2 Per-interview Coder ───────────────────────────────────────────────
+
+PROMPT_L2_DIRECT = (
+    "You are a qualitative researcher performing thematic coding of a complete employee interview.\n\n"
+    "Your task: read all Q&A turns below and generate between {l2_min} and {l2_max} open codes\n"
+    "(2-5 word noun phrases) that together cover all meaningful topics raised in the interview.\n"
+    "Be exhaustive — do not drop a theme just because it appears in only one or two turns.\n\n"
+    "For each code, list the IDs of the turns that support it (\"source_qa_ids\").\n"
+    "A turn may be left uncited if it contains nothing codeable\n"
+    "(e.g. a purely procedural exchange or a turn where the employee has nothing to add).\n\n"
+    "Polarity rule: your code label must reflect the direction of the employee's actual experience.\n"
+    "A positive statement (\"my manager supports my growth\") and a negated one\n"
+    "(\"my manager does not support my growth\") must map to codes with opposite polarity --\n"
+    "e.g. \"supportive management\" vs \"lack of management support\".\n"
+    "Never assign the same code to statements that contradict each other.\n\n"
     "--- EXAMPLE ---\n"
-    "Question: How would you describe your relationship with your direct manager?\n"
-    "Answer: She's always approachable and gives honest feedback. I feel trusted to make decisions.\n"
+    "Interview turns:\n"
+    "[abc1_t1] Q: How would you describe your relationship with your manager?\n"
+    "          A: She is always approachable and gives honest, specific feedback.\n"
+    "[abc1_t2] Q: What does a productive day look like for you?\n"
+    "          A: One where I finish a feature end-to-end without interruptions.\n"
+    "[abc1_t3] Q: Anything else you would like to share?\n"
+    "          A: Not really, I think that covers it.\n\n"
     "Output:\n"
-    '{{"codes": ["managerial approachability", "honest feedback culture", "autonomy and trust"]}}\n'
-    "--- END EXAMPLE ---\n\n"
-    "Now code the following:\n"
-    "Question: {question}\n"
-    "Answer: {anonymised_answer}\n\n"
-    "Return only valid JSON — no other text:\n"
-    '{{"codes": ["code 1", "code 2"]}}'
-)
-
-def code_one_answer(question: str, answer: str) -> list:
-    """Run L1 open coding on a single Q&A pair. Returns list of code strings."""
-    l1_min, l1_max = CONFIG["L1_CODES_RANGE"]
-    prompt = PROMPT_CODER.format(
-        l1_min=l1_min, l1_max=l1_max,
-        question=question,
-        anonymised_answer=answer
-    )
-    raw    = call_llm(prompt)
-    result = parse_json_safe(raw)
-    return result["codes"]
-
-
-# ── C7: User Consolidator (L2) ───────────────────────────────────────────────
-
-PROMPT_L2 = (
-    "You are a qualitative researcher consolidating open codes from one employee interview into\n"
-    "a unified set of between {l2_min} and {l2_max} codes. Merge overlapping or synonymous codes;\n"
-    "preserve meaningfully distinct concepts. Use 2-5 word noun-phrase labels.\n"
-    "You MUST list which source L1 codes each new code absorbs.\n\n"
-    "--- EXAMPLE ---\n"
-    'Input codes: ["managerial approachability", "manager accessibility", "open door policy", "task clarity", "clear role expectations"]\n'
-    "Output:\n"
-    '{{"consolidated_codes": [\n'
-    '  {{"code": "accessible and open management", "merged_from_l1": ["managerial approachability", "manager accessibility", "open door policy"]}},\n'
-    '  {{"code": "role and task clarity", "merged_from_l1": ["task clarity", "clear role expectations"]}}\n'
+    '{{"codes": [\n'
+    '  {{"code": "accessible and honest management", "source_qa_ids": ["abc1_t1"]}},\n'
+    '  {{"code": "uninterrupted deep work", "source_qa_ids": ["abc1_t2"]}}\n'
     "]}}\n"
+    "(abc1_t3 is uncited — the employee provided no codeable content)\n"
     "--- END EXAMPLE ---\n\n"
-    "All L1 codes from this interview:\n"
-    "{l1_codes_list}\n\n"
+    "Complete interview ({n_turns} turns):\n"
+    "{interview_turns}\n\n"
     "Return only valid JSON — no other text:\n"
-    '{{"consolidated_codes": [\n'
-    '  {{"code": "new label", "merged_from_l1": ["source l1 code"]}},\n'
-    "  ...\n"
-    "]}}"
+    '{{"codes": [{{"code": "label", "source_qa_ids": ["turn_id"]}}, ...]}}'
 )
 
-def consolidate_l2(all_l1_codes: list) -> list:
-    """Consolidate a flat list of L1 codes into L2 codes with merge lineage."""
+def code_one_interview(interview_id_prefix: str, qa_entries: list) -> list:
+    """Code a complete interview in one pass. Returns L2 codes with Q&A source lineage.
+
+    qa_entries: list of (iq_id, question, anonymised_answer) tuples in turn order.
+    Returns:    list of {"code": str, "source_qa_ids": [str]} dicts.
+    """
     l2_min, l2_max = CONFIG["L2_CODES_RANGE"]
-    l1_list_str    = "\n".join(f"- {c}" for c in all_l1_codes)
-    prompt         = PROMPT_L2.format(l2_min=l2_min, l2_max=l2_max, l1_codes_list=l1_list_str)
-    raw            = call_llm(prompt)
-    return parse_json_safe(raw)["consolidated_codes"]
+    turns = "\n".join(
+        f"[{iq_id}] Q: {question}\n          A: {answer}"
+        for iq_id, question, answer in qa_entries
+    )
+    prompt = PROMPT_L2_DIRECT.format(
+        l2_min=l2_min, l2_max=l2_max,
+        n_turns=len(qa_entries),
+        interview_turns=turns,
+    )
+    raw = call_llm(prompt)
+    return parse_json_safe(raw)["codes"]
 
 
-# ── C8: Global Consolidator (L3) ─────────────────────────────────────────────
+# ── C7: Global Consolidator (L3) ─────────────────────────────────────────────
 
 PROMPT_L3 = (
     "You are a qualitative researcher consolidating codes from {n_interviews} employee interviews\n"
     "into a final set of between {l3_min} and {l3_max} codes. Merge highly similar codes across\n"
     "interviews; keep meaningfully distinct concepts separate. Use 2-5 word noun-phrase labels.\n"
     "You MUST list which source L2 codes each new code absorbs.\n\n"
+    "Three rules -- apply before merging:\n"
+    "1. Treat the list order as arbitrary. Do not give codes that appear earlier any priority.\n"
+    "2. Never merge codes with opposite polarity. \"Access to training\" and \"lack of training\"\n"
+    "   must remain separate codes even though they share a topic.\n"
+    "3. Normalise wording before deciding: \"growth opportunities\", \"career development support\",\n"
+    "   and \"professional growth\" are likely the same concept -- merge them unless context clearly\n"
+    "   distinguishes them.\n\n"
     "--- EXAMPLE ---\n"
     "Input L2 codes:\n"
     "- team and workplace culture\n"
@@ -231,7 +248,7 @@ def consolidate_l3(all_l2_codes: list, n_interviews: int) -> list:
     return parse_json_safe(raw)["consolidated_codes"]
 
 
-# ── C9: Theme Clustering ──────────────────────────────────────────────────────
+# ── C8: Theme Clustering ──────────────────────────────────────────────────────
 
 PROMPT_CLUSTER = (
     "You are a qualitative researcher grouping final codes into thematic clusters.\n"
@@ -239,6 +256,9 @@ PROMPT_CLUSTER = (
     "Each cluster must have a 3-6 word name that reads as a natural section header: "
     "specific, concrete, and slightly engaging rather than an academic label. "
     "Title-case each word. It must contain at least 2 codes.\n\n"
+    "Rules: (1) Treat the input order as arbitrary.\n"
+    "(2) Never place codes that reflect opposite experiences in the same cluster --\n"
+    "positive and negative framings of the same topic belong in separate clusters.\n\n"
     "--- EXAMPLE ---\n"
     'Input L3 codes: ["supportive management culture", "open leadership style", "role clarity and expectations",\n'
     '                 "workload balance", "growth opportunities", "career development support"]\n'
@@ -271,10 +291,16 @@ def cluster_l3_codes(l3_list: list) -> dict:
     return {cl["name"]: cl["codes"] for cl in result["clusters"]}
 
 
-# ── C10: LLM Explainer ────────────────────────────────────────────────────────
+# ── C9: LLM Explainer ────────────────────────────────────────────────────────
 
 PROMPT_FINDING = (
     "You are a qualitative researcher writing structured findings for an HR report.\n\n"
+    "Write as a qualitative researcher presenting findings to a manager. Ground every "
+    "sentence in what the cited employee answers actually say. Do not generalise beyond "
+    "the evidence: if only some employees mentioned something, say 'some employees' or "
+    "'a few people', not 'employees' or 'the team'. If responses are mixed, reflect "
+    "that -- do not smooth over ambiguity. Avoid superlatives. Do not paint findings "
+    "more positively or negatively than the evidence supports.\n\n"
     "Cluster: {cluster_name}\n"
     "Codes in this cluster: {codes_list}\n\n"
     "Supporting employee responses:\n"
@@ -282,7 +308,8 @@ PROMPT_FINDING = (
     "Return valid JSON with exactly this structure:\n"
     '{{\n'
     '  "category": "working_well",\n'
-    '  "summary": "3-5 sentence analytical narrative for an HR audience. Explain the pattern, why it matters, and any nuance.",\n'
+    '  "tagline": "One punchy sentence capturing the core pattern -- specific, grounded, not overstated.",\n'
+    '  "summary": "3-5 sentence analytical narrative for an HR audience. Explain the pattern, why it matters, and any nuance. If evidence is mixed, say so explicitly.",\n'
     '  "quotes": ["paraphrased quote 1", "paraphrased quote 2"],\n'
     '  "tag": "1-2 word theme label e.g. Culture, Development, Wellbeing"\n'
     '}}\n\n'
@@ -294,6 +321,9 @@ PROMPT_FINDING = (
 
 PROMPT_EXPERIMENTS = (
     "You are an HR consultant reviewing employee interview findings and proposing actionable experiments.\n\n"
+    "Ground each experiment in the specific finding it addresses. Do not overstate the problem "
+    "or promise more than a small experiment can deliver. Write as a practical advisor, not a "
+    "consultant selling a solution. Be specific and concrete -- vague suggestions are not useful.\n\n"
     "Findings that need attention:\n"
     "{findings_text}\n\n"
     "Propose 2-4 concrete, low-cost experiments the team could run to address these findings.\n"
@@ -301,8 +331,9 @@ PROMPT_EXPERIMENTS = (
     "Return valid JSON:\n"
     '{{"experiments": [\n'
     '  {{"title": "Short experiment name",\n'
-    '   "summary": "One-sentence description",\n'
-    '   "rationale": "2-3 sentences: connection to findings and expected outcome",\n'
+    '   "insight": "1-2 sentences: which finding this addresses and why it matters for that team.",\n'
+    '   "try_this": "The concrete action: what to do, how often, who does it. One paragraph.",\n'
+    '   "working_when": "One sentence: the observable change that signals this is working.",\n'
     '   "tag": "theme label e.g. Culture, Development"}},\n'
     "  ...\n"
     "]}}\n\n"
@@ -337,7 +368,52 @@ def propose_experiments(needs_attention: list) -> list:
     return parse_json_safe(raw).get("experiments", [])
 
 
-# ── C12 / C13: HTML report generation ────────────────────────────────────────
+PROMPT_HEADLINE = (
+    "You are a qualitative researcher writing the opening and closing narrative for an employee insights report.\n\n"
+    "Write as a qualitative researcher presenting findings to a manager. Ground every "
+    "sentence in what the evidence shows. Do not overstate: if findings are mixed, say so. "
+    "Avoid superlatives and categorical statements. Do not paint the picture more positively "
+    "or negatively than the data supports. Tell a clear story -- do not list findings.\n\n"
+    "Number of employees interviewed: {n_interviews}\n\n"
+    "Findings:\n"
+    "{findings_text}\n\n"
+    "Return valid JSON with exactly two string fields:\n"
+    '  "headline": 2-3 paragraph opening. Give the overall team picture, name any key tensions,\n'
+    "  and frame what follows. Start directly with substance -- no preamble like 'Based on the\n"
+    "  findings'. Separate paragraphs with a newline character.\n"
+    '  "note_to_protect": 1-2 paragraph closing reflection. Identify what is genuinely positive\n'
+    "  in the data and worth protecting. Be specific about what that combination is and why it\n"
+    "  matters. Grounded, not cheerleading.\n\n"
+    'Return format: {{"headline": "...", "note_to_protect": "..."}}\n\n'
+    "Never use em dashes in any text.\n"
+    "Return only valid JSON. No other text."
+)
+
+
+def generate_headline(clusters: dict, n_interviews: int, model: str) -> dict:
+    """Generate the report headline and closing note from all cluster findings.
+
+    Returns {"headline": str, "note_to_protect": str}.
+    Store results in global_store["headline"] and global_store["note_to_protect"].
+    """
+    parts = []
+    for name, data in clusters.items():
+        cat     = data.get("category", "mixed")
+        tagline = data.get("tagline", "")
+        summary = data.get("summary", "")
+        parts.append(
+            f"Finding: {name}\n"
+            f"Category: {cat}\n"
+            f"Tagline: {tagline}\n"
+            f"Summary: {summary}"
+        )
+    findings_text = "\n\n---\n\n".join(parts)
+    prompt = PROMPT_HEADLINE.format(n_interviews=n_interviews, findings_text=findings_text)
+    raw    = call_llm(prompt, model=model)
+    return parse_json_safe(raw)
+
+
+# ── C11 / C12: HTML report generation ────────────────────────────────────────
 
 def H(s: object) -> str:
     return _html_mod.escape(str(s))
@@ -359,8 +435,8 @@ hr.sp-hr{border:none;border-top:1px solid #ebebeb;margin:18px 0}
 details.sp-d{border:1px solid #e8e8e8;border-radius:7px}
 details.sp-d>summary{padding:8px 13px;cursor:pointer;font-size:12px;font-weight:500;color:#666;list-style:none;user-select:none}
 details.sp-d>summary::-webkit-details-marker{display:none}
-details.sp-d>summary::before{content:'&#9654; ';font-size:9px}
-details[open].sp-d>summary::before{content:'&#9660; '}
+details.sp-d>summary::before{content:'\\25B6  ';font-size:9px}
+details[open].sp-d>summary::before{content:'\\25BC  '}
 .sp-db{padding:2px 14px 14px}
 .sp-db h4{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#bbb;margin:12px 0 5px}
 .sp-db p{font-size:13px;color:#333;line-height:1.7}
@@ -406,8 +482,8 @@ APP_CSS = (
     "border-radius:7px;user-select:none;display:block}\n"
     "details[open].det>summary{border-bottom-left-radius:0;border-bottom-right-radius:0}\n"
     "details.det>summary::-webkit-details-marker{display:none}\n"
-    "details.det>summary::before{content:'&#9654;  ';font-size:9px}\n"
-    "details[open].det>summary::before{content:'&#9660;  '}\n"
+    "details.det>summary::before{content:'\\25B6  ';font-size:9px}\n"
+    "details[open].det>summary::before{content:'\\25BC  '}\n"
     ".det-body{padding:4px 14px 14px;border:1px solid #e8e8e8;border-top:none;"
     "border-radius:0 0 7px 7px}\n"
     ".det-body h4{font-size:10px;font-weight:700;text-transform:uppercase;"
@@ -450,6 +526,19 @@ APP_CSS = (
     "padding:1px 5px;display:inline-block;margin-bottom:5px;color:#999}\n"
     ".qa-ln{font-size:13px;color:#444;margin-bottom:3px}\n"
     ".empty{font-size:12px;color:#ccc;font-style:italic;padding:4px 0}\n"
+    # ── Report tab document-style classes (rpt- prefix) ───────────────────────
+    ".rpt-title{font-size:26px;font-weight:800;margin-bottom:6px}\n"
+    ".rpt-sub{font-size:13px;color:#888;margin-bottom:28px}\n"
+    ".rpt-sec{font-size:20px;font-weight:700;margin:32px 0 14px}\n"
+    ".rpt-hr{border:none;border-top:1px solid #e8e8e8;margin:24px 0}\n"
+    ".rpt-num{font-size:16px;font-weight:700;margin:0 0 4px;color:#111}\n"
+    ".rpt-tagline{font-size:14px;font-weight:600;color:#333;margin-bottom:10px}\n"
+    ".rpt-body{font-size:14px;line-height:1.75;color:#444;margin-bottom:8px}\n"
+    ".rpt-qlabel{font-size:10px;font-weight:700;text-transform:uppercase;"
+    "letter-spacing:.6px;color:#bbb;margin:14px 0 6px}\n"
+    ".rpt-quote{font-size:13px;color:#666;font-style:italic;margin-bottom:6px}\n"
+    ".rpt-exp-title{font-size:15px;font-weight:700;margin:20px 0 8px}\n"
+    ".rpt-intro{font-size:14px;color:#555;margin-bottom:16px}\n"
 )
 
 
@@ -535,37 +624,6 @@ def build_inline_report_html(clusters: dict, interviews: list, experiments: list
     )
 
 
-def _rcard(name: str, data: dict) -> str:
-    hl = H(name)
-    tg = H(data.get("tag", ""))
-    v  = data.get("voice_count", 0)
-    sm = H(data.get("summary", ""))
-    ql = "".join(f"<li>{H(q)}</li>" for q in data.get("quotes", []))
-    return (
-        f'<div class="card"><p class="hl">{hl}</p>'
-        f'<p class="meta"><span class="badge">{tg}</span>'
-        f' &middot; {v} voice{"s" if v != 1 else ""}</p>'
-        f'<details class="det"><summary>Read summary and quotes</summary>'
-        f'<div class="det-body"><h4>Summary</h4><p>{sm}</p>'
-        f'<h4>Paraphrased quotes</h4>'
-        f'<ol class="quotes">{ql}</ol></div></details></div>'
-        f'<hr class="div">'
-    )
-
-
-def _ecard(exp: dict) -> str:
-    t = H(exp.get("title", ""))
-    s = H(exp.get("summary", ""))
-    r = H(exp.get("rationale", ""))
-    g = H(exp.get("tag", ""))
-    return (
-        f'<div class="card"><p class="exp-hl">{t}</p>'
-        f'<p class="meta"><span class="badge">{g}</span> {s}</p>'
-        f'<details class="det"><summary>Read rationale</summary>'
-        f'<div class="det-body"><p>{r}</p></div></details></div>'
-    )
-
-
 def _ltree(
     lineage: dict, clusters: dict,
     global_store: dict, interview_store: dict, db: dict
@@ -580,7 +638,7 @@ def _ltree(
     out = ""
 
     for cname, lin in lineage.items():
-        n_src   = len({e["interview_question_id"] for e in lin["l1_codes"]})
+        n_src   = len(lin.get("l1_qa_ids", []))
         cl_data = clusters.get(cname, {})
         cl_dot  = dot_cls.get(cl_data.get("category", "mixed"), "lv-dot-a")
         cl_tag  = H(cl_data.get("tag", ""))
@@ -591,35 +649,26 @@ def _ltree(
             ml2 = l3i.get("merged_from_l2", [])
             l2h = ""
             for l2c in ml2:
-                l2i  = l2_map.get(l2c, {})
-                ivid = l2i.get("interview_id", "unknown")
-                ml1  = l2i.get("merged_from_l1", [])
-                l1h  = ""
-                for l1c in ml1:
-                    iqs = [iq for iq, e in db.items() if l1c in e.get("l1_codes", [])]
-                    qah = ""
-                    for iq in iqs:
-                        e = db[iq]
+                l2i    = l2_map.get(l2c, {})
+                ivid   = l2i.get("interview_id", "unknown")
+                src_qa = l2i.get("source_qa_ids", [])
+                qah = ""
+                for iq_id in src_qa:
+                    e = db.get(iq_id)
+                    if e:
                         qah += (
                             f'<div class="qa-blk">'
-                            f'<span class="iq-tag">{H(iq)}</span>'
+                            f'<span class="iq-tag">{H(iq_id)}</span>'
                             f'<p class="qa-ln"><strong>Q:</strong> {H(e["question"])}</p>'
                             f'<p class="qa-ln"><strong>A:</strong> {H(e["anonymised_answer"])}</p>'
                             f'</div>'
                         )
-                    l1h += (
-                        f'<details class="tr tr-l1">'
-                        f'<summary><span class="lv lv-1">L1</span> {H(l1c)}</summary>'
-                        f'<div class="tr-body">'
-                        f'{qah or "<p class=empty>No source Q&amp;A found.</p>"}'
-                        f'</div></details>'
-                    )
                 l2h += (
                     f'<details class="tr tr-l2">'
                     f'<summary><span class="lv lv-2">L2</span> {H(l2c)}'
                     f' <span class="int-tag">{H(ivid[:8])}</span></summary>'
                     f'<div class="tr-body">'
-                    f'{l1h or "<p class=empty>No L1 codes.</p>"}'
+                    f'{qah or "<p class=empty>No source Q&amp;A found.</p>"}'
                     f'</div></details>'
                 )
             l3h += (
@@ -642,6 +691,42 @@ def _ltree(
     return out
 
 
+def _rpt_insight(n: int, name: str, data: dict) -> str:
+    """Render one numbered insight block in the document-style report tab."""
+    tagline = H(data.get("tagline", ""))
+    summary = H(data.get("summary", ""))
+    quotes  = data.get("quotes", [])
+    ql = "".join(
+        f'<p class="rpt-quote">&ldquo;{H(q)}&rdquo;</p>' for q in quotes
+    )
+    ql_block = f'<p class="rpt-qlabel">What people said:</p>{ql}' if quotes else ""
+    return (
+        f'<h3 class="rpt-num">{n}. {H(name)}</h3>'
+        f'<p class="rpt-tagline">{tagline}</p>'
+        f'<p class="rpt-body">{summary}</p>'
+        f'{ql_block}'
+        f'<hr class="rpt-hr">'
+    )
+
+
+def _rpt_exp(n: int, exp: dict) -> str:
+    """Render one experiment block in the document-style report tab."""
+    title        = H(exp.get("title", ""))
+    insight      = H(exp.get("insight") or exp.get("summary", ""))
+    try_this     = H(exp.get("try_this") or exp.get("rationale", ""))
+    working_when = H(exp.get("working_when", ""))
+    ww_block = (
+        f'<p class="rpt-body"><strong>You\'ll know it\'s working when</strong> {working_when}</p>'
+    ) if working_when else ""
+    return (
+        f'<h3 class="rpt-exp-title">Experiment {n}: {title}</h3>'
+        f'<p class="rpt-body"><strong>The insight:</strong> {insight}</p>'
+        f'<p class="rpt-body"><strong>Try this:</strong> {try_this}</p>'
+        f'{ww_block}'
+        f'<hr class="rpt-hr">'
+    )
+
+
 def build_report_html(
     clusters: dict, interviews: list, experiments: list,
     global_store: dict, interview_store: dict, lineage: dict, db: dict
@@ -657,39 +742,69 @@ def build_report_html(
         if logo_file else '<div class="logo">SP</div>'
     )
 
-    by_cat: dict = {"working_well": [], "needs_work": [], "mixed": []}
-    for n, d in clusters.items():
-        by_cat.get(d.get("category", "mixed"), by_cat["mixed"]).append((n, d))
+    n_iv     = len(interviews)
+    n_themes = len(clusters)
+    date_str = datetime.datetime.now().strftime("%B %Y")
 
-    report = ""
-    if by_cat["working_well"]:
-        report += "<h2>What&#x2019;s working well</h2>"
-        for n, d in by_cat["working_well"]:
-            report += _rcard(n, d)
-    if by_cat["needs_work"]:
-        report += "<h2>What needs work</h2>"
-        for n, d in by_cat["needs_work"]:
-            report += _rcard(n, d)
-    if by_cat["mixed"]:
-        report += "<h2>Mixed signals &#x26; tensions</h2>"
-        for n, d in by_cat["mixed"]:
-            report += _rcard(n, d)
+    # Title block
+    report = (
+        f'<h1 class="rpt-title">Team Insights Report</h1>'
+        f'<p class="rpt-sub">Based on: {n_iv} confidential employee conversations'
+        f' &middot; Themes identified: {n_themes}'
+        f' &middot; Date: {date_str}</p>'
+        f'<hr class="rpt-hr">'
+    )
+
+    # The headline section
+    headline_text = global_store.get("headline", "")
+    if headline_text:
+        paras = [p.strip() for p in headline_text.split("\n") if p.strip()]
+        report += f'<h2 class="rpt-sec">The headline</h2>'
+        report += "".join(f'<p class="rpt-body">{H(p)}</p>' for p in paras)
+        report += '<hr class="rpt-hr">'
+
+    # Insights -- working_well first, then mixed, then needs_work
+    ordered = (
+        [(name, d) for name, d in clusters.items() if d.get("category") == "working_well"]
+        + [(name, d) for name, d in clusters.items() if d.get("category") == "mixed"]
+        + [(name, d) for name, d in clusters.items() if d.get("category") == "needs_work"]
+    )
+    if ordered:
+        report += f'<h2 class="rpt-sec">Insights</h2><hr class="rpt-hr">'
+        for idx, (name, d) in enumerate(ordered, 1):
+            report += _rpt_insight(idx, name, d)
+
+    # Experiments
     if experiments:
-        report += "<h2>Experiments</h2>"
-        for exp in experiments:
-            report += _ecard(exp)
+        n_exp     = len(experiments)
+        exp_label = "experiment" if n_exp == 1 else "experiments"
+        report += f'<h2 class="rpt-sec">{n_exp} {exp_label} to consider</h2>'
+        report += (
+            '<p class="rpt-intro">These are lightweight, low-risk actions you can try '
+            'in the next 2 to 4 weeks. Each one addresses a pattern from the insights above.</p>'
+        )
+        for idx, exp in enumerate(experiments, 1):
+            report += _rpt_exp(idx, exp)
 
-    n_iv = len(interviews)
+    # A note on what to protect
+    note_text = global_store.get("note_to_protect", "")
+    if note_text:
+        note_paras = [p.strip() for p in note_text.split("\n") if p.strip()]
+        report += f'<h2 class="rpt-sec">A note on what to protect</h2>'
+        report += "".join(f'<p class="rpt-body">{H(p)}</p>' for p in note_paras)
+        report += '<hr class="rpt-hr">'
+
+    # Methodology block
     report += (
-        '<div class="about"><h3>Spradley guide: How the analysis works</h3>'
-        f'<p>Insights are based on qualitative analysis of {n_iv} employee AI interview '
-        'transcripts. Rather than survey scores, we surface <strong>patterns</strong> '
-        'from what people say.</p>'
+        '<div class="about"><h3>How this analysis works</h3>'
+        f'<p>Insights are based on qualitative analysis of {n_iv} confidential employee '
+        'conversations. Rather than survey scores, Spradley surfaces <strong>patterns</strong> '
+        'from what people actually said.</p>'
         '<ol>'
-        '<li>Transcripts are clustered to identify recurring patterns.</li>'
-        '<li>Patterns are distilled into clear findings.</li>'
-        '<li>Findings are labelled based on matching workplace themes.</li>'
-        '<li>Paraphrased quotes give context while preserving anonymity.</li>'
+        '<li>Conversations are coded to surface recurring topics from each interview.</li>'
+        '<li>Codes are consolidated and grouped into thematic clusters across all interviews.</li>'
+        '<li>Each cluster is analysed to produce a finding grounded in the source Q&amp;A.</li>'
+        '<li>Paraphrased quotes provide context while protecting anonymity.</li>'
         '</ol></div>'
         '<div class="footer">Spradley &middot; app.spradley.io</div>'
     )

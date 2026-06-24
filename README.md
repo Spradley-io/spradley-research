@@ -20,10 +20,10 @@ The pipeline processes interview transcripts in four stages:
 
 | Coding level | Scope | Range |
 |---|---|---|
-| L1 | Open codes per Q&A pair | 1–10 |
-| L2 | Consolidated codes per interview | 20–30 |
-| L3 | Global codes across all interviews | 40–80 |
-| Clusters | Thematic clusters | 7–12 |
+| L1 | Open codes per Q&A pair | 1-10 |
+| L2 | Consolidated codes per interview | 20-30 |
+| L3 | Global codes across all interviews | 40-80 |
+| Clusters | Thematic clusters | 7-12 |
 
 ---
 
@@ -67,6 +67,10 @@ Open `Pipeline_Execution.ipynb`, select the **Python (Spradley)** kernel, and ru
 | `pipeline_output/clusters.json` | Final clusters with headline, summary, quotes, category | No (gitignored) |
 | `pipeline_output/experiments.json` | Proposed experiments for needs\_work and mixed clusters | No (gitignored) |
 | `pipeline_output/report.html` | Standalone report, served via GitHub Pages | Yes |
+| `pipeline_output/eval_report.html` | Eval results report with per-eval detail and Q&A traceability | Yes |
+| `pipeline_output/eval_results.json` | Latest eval run results (auto-restored on next E0 run) | No (gitignored) |
+| `pipeline_output/eval_cache.json` | Cached LLM calls for E6a and E8 (paraphrase + negation) | No (gitignored) |
+| `pipeline_output/eval_history/` | Full snapshots per eval run (JSON + rendered HTML) | No (gitignored) |
 
 ---
 
@@ -78,4 +82,30 @@ Change `LLM_PROVIDER` and `LLM_MODEL` in cell **C0**. The client implementation 
 
 ## Evaluating the pipeline
 
-Open `Pipeline_Evals.ipynb` and run all cells. It reads from `pipeline_output/` (no re-runs of the main pipeline needed) and writes `pipeline_output/eval_report.html`.
+Open `Pipeline_Evals.ipynb` and run cells **E0 to Final** in order. It reads from `pipeline_output/` (no re-runs of the main pipeline needed) and writes `pipeline_output/eval_report.html`.
+
+### Eval cells
+
+| Cell | Name | What it tests |
+|------|------|---------------|
+| E0 | Setup | Loads pipeline outputs; auto-restores `eval_results.json` from the last run |
+| E1 | L2 Code Stability | Reruns L2 coding N times per interview; measures cosine soft-Jaccard (gate >= 0.6) |
+| E2b | L2 Label Quality | Claude judge checks each L2 label against its source Q&A turns |
+| EL | Lineage Integrity | Checks that every cluster code traces back to at least one Q&A pair |
+| E4 | Clustering Stability | Reruns L3 clustering N times; measures pairwise ARI (gate >= 0.7) |
+| E5 | Faithfulness | Claude judge checks cluster narratives are grounded in source Q&A |
+| E5b | Sentiment Overclaim | Claude judge checks narratives do not overstate positive or negative sentiment |
+| E6 | Metamorphic Invariance | Paraphrase robustness (gate >= 0.5) and order invariance (gate >= 0.7) |
+| E7 | Re-identification Probe | Adversarial Claude tries to re-identify employees from the report |
+| E8 | Negation Sensitivity | Negates polarity-bearing answers; checks codes change accordingly (gate >= 60%) |
+| Final | Report | Generates `eval_report.html` and saves a full history snapshot |
+
+### Restoring a previous run
+
+E0 auto-restores from `eval_results.json` on kernel start. To load a specific historical run, set `HISTORY_RUN` at the top of E0:
+
+```python
+HISTORY_RUN = "2026-06-23T14-30-00"  # paste a timestamp from the history-list cell
+```
+
+Run the history-list cell (just below E0) to see all available timestamps.
