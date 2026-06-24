@@ -8,21 +8,26 @@ Automated open coding of employee interviews using an LLM, following grounded th
 
 ## How it works
 
-The pipeline processes interview transcripts in four stages:
+The pipeline processes employee interview transcripts through six sequential LLM-assisted stages (numbered in the figure above). All intermediate outputs are persisted as JSON to `pipeline_output/` after each stage, enabling any stage to be re-run in isolation.
 
-**1. Ingest and anonymise:** Transcripts are loaded from a CSV, paired into question-answer turns, and scrubbed of PII (names, emails, phone numbers) before anything is stored.
+**Stage 1 - Anonymisation:** Raw transcripts are loaded from a CSV file and paired into question-answer turns by matching each employee response to the preceding bot-generated question. A rule-based PII scrubber removes names, email addresses, and phone numbers via regular expression matching before any data is stored or sent to the LLM.
 
-**2. Open coding (L1 to L2 to L3):** The LLM reads each Q&A pair and generates 1-10 inductive codes grounded in the employee's exact words (L1). These are consolidated per interview into 20-30 broader codes (L2), then merged across all interviews into 40-80 global codes (L3). Every merge step records which source codes it absorbed, keeping the lineage intact.
+**Stage 2 - Per-Interview Coding (L2):** A single LLM call reads all Q&A turns for one interview and generates 20-30 inductive open codes (2-5 word noun phrases) that collectively cover all substantive topics raised. Each code records the IDs of the Q&A turns that support it, establishing the primary traceability link. A polarity constraint in the prompt requires that positive and negative framings of the same topic produce distinct, direction-specific code labels. This stage repeats independently for each interview.
 
-**3. Theme clustering:** L3 codes are grouped into 7-12 named thematic clusters, each accompanied by a narrative written by the LLM and grounded in the original Q&A pairs.
+**Stage 3 - Cross-Interview Consolidation (L3):** All per-interview code sets are passed in a single LLM call that merges semantically equivalent labels and produces 40-80 globally shared codes. The model is instructed to treat input order as arbitrary, preserve polarity separation, and normalise synonymous labels before merging. Each L3 code retains a list of the L2 codes it absorbed.
 
-**4. Persist:** All data structures are written to `pipeline_output/` as JSON, including the full lineage chain from cluster name down to individual interview question IDs.
+**Stage 4 - Theme Clustering:** The shared L3 code set is grouped into 7-12 named thematic clusters in a single LLM call. Cluster names are specified as concrete, title-case 3-6 word headers. A constraint in the prompt prohibits placing codes that reflect opposite experiences in the same cluster.
 
-| Coding level | Scope | Range |
+**Stage 5 - Per-Theme Synthesis:** For each cluster, a structured LLM call generates: a category assessment (`working_well`, `mixed`, or `needs_work`), a one-sentence tagline, a 3-5 sentence analytical narrative grounded in the source Q&A, and 2-4 paraphrased representative quotes with identifying details removed. For clusters categorised as `needs_work` or `mixed`, a separate call proposes 2-4 actionable experiments with observable success criteria.
+
+**Stage 6 - Headline Synthesis:** A final LLM call reads all cluster findings and produces a 2-3 paragraph opening narrative contextualising the overall team picture, followed by a closing reflection identifying what in the data is worth protecting. These frame the report without duplicating the per-cluster narratives.
+
+**Traceability:** Every output level records its provenance. Each L3 code lists the L2 codes it absorbed; each L2 code lists the Q&A turn IDs that support it. This produces a four-level lineage chain -- Cluster to L3 to L2 to Q&A -- navigable in the report's Data Lineage tab.
+
+| Coding level | Scope | Typical range |
 |---|---|---|
-| L1 | Open codes per Q&A pair | 1-10 |
-| L2 | Consolidated codes per interview | 20-30 |
-| L3 | Global codes across all interviews | 40-80 |
+| L2 | Open codes per interview (direct) | 20-30 |
+| L3 | Consolidated codes across all interviews | 40-80 |
 | Clusters | Thematic clusters | 7-12 |
 
 ---
@@ -31,7 +36,7 @@ The pipeline processes interview transcripts in four stages:
 
 ![Technical architecture](assets/Coding_Pipeline_Architecture.svg)
 
-Each box corresponds to a single notebook cell (C0-C13), keeping stages independently re-runnable. State is held in Python dicts and persisted to JSON after each run.
+Each numbered stage corresponds to one or more notebook cells (C0-C13), keeping stages independently re-runnable. State is held in Python dicts in memory and written to JSON after each stage completes.
 
 ---
 
@@ -60,10 +65,10 @@ Open `Pipeline_Execution.ipynb`, select the **Python (Spradley)** kernel, and ru
 
 | File | Contents | Committed |
 |------|----------|-----------|
-| `pipeline_output/db.json` | Per Q&A store: anonymised answer + L1 codes | No (gitignored) |
-| `pipeline_output/interview_store.json` | L2 codes per interview (with merge lineage) | No (gitignored) |
-| `pipeline_output/global_store.json` | L3 codes across all interviews (with merge lineage) | No (gitignored) |
-| `pipeline_output/lineage.json` | Full chain: cluster to L3 to L2 to L1 to Q&A ID | No (gitignored) |
+| `pipeline_output/db.json` | Per Q&A turn store: anonymised question and answer, keyed by turn ID | No (gitignored) |
+| `pipeline_output/interview_store.json` | L2 codes per interview with source turn IDs | No (gitignored) |
+| `pipeline_output/global_store.json` | L3 codes with merge lineage from L2 | No (gitignored) |
+| `pipeline_output/lineage.json` | Full chain: cluster to L3 to L2 to Q&A turn ID | No (gitignored) |
 | `pipeline_output/clusters.json` | Final clusters with headline, summary, quotes, category | No (gitignored) |
 | `pipeline_output/experiments.json` | Proposed experiments for needs\_work and mixed clusters | No (gitignored) |
 | `pipeline_output/report.html` | Standalone report, served via GitHub Pages | Yes |
