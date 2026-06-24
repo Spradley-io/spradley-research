@@ -1,118 +1,168 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1640 612" font-family="'Segoe UI',Arial,sans-serif">
-<defs>
-<marker id="ah-flow" markerWidth="9" markerHeight="9" refX="7.5" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="#2b333d"/></marker>
-<marker id="ah-rw" markerWidth="9" markerHeight="9" refX="7.5" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 z" fill="#54606e"/></marker>
-</defs>
-<rect width="1640" height="612" fill="#ffffff"/>
-<text x="24" y="34" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="21" fill="#16202e" font-weight="bold" text-anchor="start">Qualitative Coding Pipeline  ·  Architecture</text>
-<text x="24" y="55" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="12.5" fill="#5a6473" font-weight="normal" text-anchor="start">From interview transcripts to HR-ready themes, with every theme traceable back to the original employee answers.</text>
-<text x="24" y="73" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="12" fill="#3f6fb0" font-weight="normal" text-anchor="start">Logic:  open coding  →  consolidation  →  thematic analysis.  Detail is progressively abstracted while the underlying evidence is preserved.</text>
-<rect x="24" y="122" width="140" height="96" rx="2" ry="2" fill="#efefef" stroke="#8c8c8c" stroke-width="1.6" opacity="1.0"/>
-<text x="94.0" y="152" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="11.4" fill="#16202e" font-weight="bold" text-anchor="middle">Interview Transcripts</text>
-<text x="94.0" y="169" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="10.8" fill="#5a6473" font-weight="normal" text-anchor="middle">Q&amp;A per employee</text>
-<rect x="204" y="122" width="150" height="96" rx="9" ry="9" fill="#a4c2f4" stroke="#3f6fb0" stroke-width="1.6" opacity="1.0"/>
-<text x="279.0" y="152" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="12.6" fill="#16202e" font-weight="bold" text-anchor="middle">Anonymise</text>
-<text x="279.0" y="169" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="10.8" fill="#5a6473" font-weight="normal" text-anchor="middle">remove names &amp; PII</text>
-<rect x="394" y="122" width="176" height="96" rx="9" ry="9" fill="#a4c2f4" stroke="#3f6fb0" stroke-width="1.6" opacity="1.0"/>
-<text x="482.0" y="152" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="12.6" fill="#16202e" font-weight="bold" text-anchor="middle">Open Coding</text>
-<text x="482.0" y="169" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="10.8" fill="#5a6473" font-weight="normal" text-anchor="middle">label each answer</text>
-<text x="482.0" y="206" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="10.4" fill="#3f6fb0" font-weight="bold" text-anchor="middle">1–10 codes / answer</text>
-<rect x="539" y="129" width="24" height="15" rx="7" ry="7" fill="#ffffff" stroke="#3f6fb0" stroke-width="1.3" opacity="1.0"/>
-<text x="551" y="140.4" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="10" fill="#3f6fb0" font-weight="bold" text-anchor="middle">L1</text>
-<path d="M469.0 112 A 13 13 0 1 1 495.0 113" fill="none" stroke="#54606e" stroke-width="1.5" stroke-dasharray="7 4 2 4" marker-end="url(#ah-rw)"/>
-<text x="482.0" y="96" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="10" fill="#5a6473" font-weight="normal" text-anchor="middle" font-style="italic">per answer</text>
-<rect x="610" y="122" width="178" height="96" rx="9" ry="9" fill="#a4c2f4" stroke="#3f6fb0" stroke-width="1.6" opacity="1.0"/>
-<text x="699.0" y="152" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="12.6" fill="#16202e" font-weight="bold" text-anchor="middle">Consolidate</text>
-<text x="699.0" y="169" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="10.8" fill="#5a6473" font-weight="normal" text-anchor="middle">per employee</text>
-<text x="699.0" y="206" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="10.4" fill="#3f6fb0" font-weight="bold" text-anchor="middle">20–30 codes</text>
-<rect x="757" y="129" width="24" height="15" rx="7" ry="7" fill="#ffffff" stroke="#3f6fb0" stroke-width="1.3" opacity="1.0"/>
-<text x="769" y="140.4" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="10" fill="#3f6fb0" font-weight="bold" text-anchor="middle">L2</text>
-<path d="M686.0 112 A 13 13 0 1 1 712.0 113" fill="none" stroke="#54606e" stroke-width="1.5" stroke-dasharray="7 4 2 4" marker-end="url(#ah-rw)"/>
-<text x="699.0" y="96" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="10" fill="#5a6473" font-weight="normal" text-anchor="middle" font-style="italic">per employee</text>
-<rect x="828" y="122" width="178" height="96" rx="9" ry="9" fill="#a4c2f4" stroke="#3f6fb0" stroke-width="1.6" opacity="1.0"/>
-<text x="917.0" y="152" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="12.6" fill="#16202e" font-weight="bold" text-anchor="middle">Consolidate</text>
-<text x="917.0" y="169" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="10.8" fill="#5a6473" font-weight="normal" text-anchor="middle">across all employees</text>
-<text x="917.0" y="206" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="10.4" fill="#3f6fb0" font-weight="bold" text-anchor="middle">40–80 codes</text>
-<rect x="975" y="129" width="24" height="15" rx="7" ry="7" fill="#ffffff" stroke="#3f6fb0" stroke-width="1.3" opacity="1.0"/>
-<text x="987" y="140.4" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="10" fill="#3f6fb0" font-weight="bold" text-anchor="middle">L3</text>
-<rect x="1046" y="122" width="176" height="96" rx="9" ry="9" fill="#a4c2f4" stroke="#3f6fb0" stroke-width="1.6" opacity="1.0"/>
-<text x="1134.0" y="152" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="12.6" fill="#16202e" font-weight="bold" text-anchor="middle">Theme Clustering</text>
-<text x="1134.0" y="169" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="10.8" fill="#5a6473" font-weight="normal" text-anchor="middle">group related codes</text>
-<text x="1134.0" y="206" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="10.4" fill="#3f6fb0" font-weight="bold" text-anchor="middle">7–12 themes</text>
-<rect x="1262" y="122" width="170" height="96" rx="9" ry="9" fill="#a4c2f4" stroke="#3f6fb0" stroke-width="1.6" opacity="1.0"/>
-<text x="1347.0" y="152" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="11.4" fill="#16202e" font-weight="bold" text-anchor="middle">Narrative Synthesis</text>
-<text x="1347.0" y="169" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="10.8" fill="#5a6473" font-weight="normal" text-anchor="middle">explain each theme,</text>
-<text x="1347.0" y="184" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="10.8" fill="#5a6473" font-weight="normal" text-anchor="middle">grounded in quotes</text>
-<path d="M1334.0 112 A 13 13 0 1 1 1360.0 113" fill="none" stroke="#54606e" stroke-width="1.5" stroke-dasharray="7 4 2 4" marker-end="url(#ah-rw)"/>
-<text x="1347.0" y="96" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="10" fill="#5a6473" font-weight="normal" text-anchor="middle" font-style="italic">per theme</text>
-<rect x="1462" y="122" width="154" height="96" rx="2" ry="2" fill="#efefef" stroke="#8c8c8c" stroke-width="1.6" opacity="1.0"/>
-<text x="1539.0" y="152" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="12.6" fill="#16202e" font-weight="bold" text-anchor="middle">Themes + Story</text>
-<text x="1539.0" y="169" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="10.8" fill="#5a6473" font-weight="normal" text-anchor="middle">for HR review</text>
-<line x1="166" y1="170" x2="202" y2="170" stroke="#2b333d" stroke-width="2.0" marker-end="url(#ah-flow)"/>
-<line x1="356" y1="170" x2="392" y2="170" stroke="#2b333d" stroke-width="2.0" marker-end="url(#ah-flow)"/>
-<line x1="572" y1="170" x2="608" y2="170" stroke="#2b333d" stroke-width="2.0" marker-end="url(#ah-flow)"/>
-<line x1="790" y1="170" x2="826" y2="170" stroke="#2b333d" stroke-width="2.0" marker-end="url(#ah-flow)"/>
-<line x1="1008" y1="170" x2="1044" y2="170" stroke="#2b333d" stroke-width="2.0" marker-end="url(#ah-flow)"/>
-<line x1="1224" y1="170" x2="1260" y2="170" stroke="#2b333d" stroke-width="2.0" marker-end="url(#ah-flow)"/>
-<line x1="1434" y1="170" x2="1460" y2="170" stroke="#2b333d" stroke-width="2.0" marker-end="url(#ah-flow)"/>
-<text x="374" y="233" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="10.2" fill="#5a6473" font-weight="normal" text-anchor="middle" font-style="italic">anonymised Q&amp;A</text>
-<text x="590" y="233" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="10.2" fill="#5a6473" font-weight="normal" text-anchor="middle" font-style="italic">open codes</text>
-<text x="808" y="233" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="10.2" fill="#5a6473" font-weight="normal" text-anchor="middle" font-style="italic">per-employee code sets</text>
-<text x="1026" y="233" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="10.2" fill="#5a6473" font-weight="normal" text-anchor="middle" font-style="italic">shared code set</text>
-<rect x="1455" y="225" width="161" height="25" rx="6" ry="6" fill="#fdf3d6" stroke="#d9b94f" stroke-width="1.2" opacity="0.95"/>
-<text x="1535" y="242" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="9.8" fill="#8a6d12" font-weight="normal" text-anchor="middle">→ HR Dashboard (out of scope)</text>
-<line x1="1539" y1="218" x2="1535" y2="225" stroke="#2b333d" stroke-width="2.0" marker-end="url(#ah-flow)"/>
-<path d="M430 307 A 210.0 11 0 0 1 850 307 L 850 379 A 210.0 11 0 0 1 430 379 Z" fill="#eaeff7" stroke="#7f93b5" stroke-width="1.6"/>
-<path d="M430 307 A 210.0 11 0 0 0 850 307" fill="none" stroke="#7f93b5" stroke-width="1.6"/>
-<text x="640.0" y="322" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="14" fill="#16202e" font-weight="bold" text-anchor="middle">Coded Data Store</text>
-<text x="640.0" y="342" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="10.4" fill="#5a6473" font-weight="normal" text-anchor="middle">anonymised Q&amp;A   ·   codes at every level   ·   theme assignments</text>
-<text x="640.0" y="360" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="10.4" fill="#5a6473" font-weight="normal" text-anchor="middle" font-style="italic">single source of truth that keeps findings traceable</text>
-<line x1="394" y1="244" x2="1000" y2="244" stroke="#54606e" stroke-width="1.4" stroke-dasharray="2 4"/>
-<line x1="482.0" y1="218" x2="482.0" y2="244" stroke="#54606e" stroke-width="1.4" stroke-dasharray="2 4"/>
-<line x1="699.0" y1="218" x2="699.0" y2="244" stroke="#54606e" stroke-width="1.4" stroke-dasharray="2 4"/>
-<line x1="917.0" y1="218" x2="917.0" y2="244" stroke="#54606e" stroke-width="1.4" stroke-dasharray="2 4"/>
-<line x1="640.0" y1="244" x2="640.0" y2="295" stroke="#54606e" stroke-width="1.5" stroke-dasharray="2 4" marker-end="url(#ah-rw)"/>
-<path d="M838 304 Q 1077.5 285.0 1317.0 222" fill="none" stroke="#54606e" stroke-width="1.5" stroke-dasharray="7 5" marker-end="url(#ah-rw)"/>
-<text x="1015" y="276" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="10.5" fill="#5a6473" font-weight="normal" text-anchor="middle" font-style="italic">pull supporting quotes</text>
-<rect x="1196" y="252" width="430" height="124" rx="7" ry="7" fill="#ffffff" stroke="#c9d2de" stroke-width="1.3" opacity="1.0"/>
-<text x="1210" y="273" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="12.5" fill="#16202e" font-weight="bold" text-anchor="start">Legend</text>
-<line x1="1212" y1="298" x2="1244" y2="298" stroke="#2b333d" stroke-width="1.8" marker-end="url(#ah-flow)"/>
-<text x="1252" y="302" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="10.4" fill="#5a6473" font-weight="normal" text-anchor="start">data flow</text>
-<line x1="1212" y1="320" x2="1244" y2="320" stroke="#54606e" stroke-width="1.8" stroke-dasharray="2 4" marker-end="url(#ah-rw)"/>
-<text x="1252" y="324" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="10.4" fill="#5a6473" font-weight="normal" text-anchor="start">records to store</text>
-<line x1="1212" y1="342" x2="1244" y2="342" stroke="#54606e" stroke-width="1.8" stroke-dasharray="7 5" marker-end="url(#ah-rw)"/>
-<text x="1252" y="346" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="10.4" fill="#5a6473" font-weight="normal" text-anchor="start">reads from store</text>
-<line x1="1212" y1="364" x2="1244" y2="364" stroke="#54606e" stroke-width="1.8" stroke-dasharray="7 4 2 4" marker-end="url(#ah-rw)"/>
-<text x="1252" y="368" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="10.4" fill="#5a6473" font-weight="normal" text-anchor="start">repeats per item</text>
-<rect x="1408" y="288" width="24" height="13" rx="5" ry="5" fill="#a4c2f4" stroke="#3f6fb0" stroke-width="1.6" opacity="1.0"/>
-<text x="1440" y="302" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="10.4" fill="#5a6473" font-weight="normal" text-anchor="start">automated step (LLM)</text>
-<rect x="1408" y="310" width="24" height="13" rx="2" ry="2" fill="#efefef" stroke="#8c8c8c" stroke-width="1.6" opacity="1.0"/>
-<text x="1440" y="324" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="10.4" fill="#5a6473" font-weight="normal" text-anchor="start">data in / out</text>
-<path d="M1408 341 A 12.0 11 0 0 1 1432 341 L 1432 336 A 12.0 11 0 0 1 1408 336 Z" fill="#eaeff7" stroke="#7f93b5" stroke-width="1.6"/>
-<path d="M1408 341 A 12.0 11 0 0 0 1432 341" fill="none" stroke="#7f93b5" stroke-width="1.6"/>
-<text x="1440" y="346" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="10.4" fill="#5a6473" font-weight="normal" text-anchor="start">stored data</text>
-<rect x="1408" y="353" width="24" height="15" rx="7" ry="7" fill="#ffffff" stroke="#3f6fb0" stroke-width="1.3" opacity="1.0"/>
-<text x="1420" y="364.4" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="10" fill="#3f6fb0" font-weight="bold" text-anchor="middle">L#</text>
-<text x="1440" y="368" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="10.4" fill="#5a6473" font-weight="normal" text-anchor="start">consolidation level</text>
-<rect x="24" y="398" width="1592" height="184" rx="8" ry="8" fill="#fbfcfe" stroke="#c9d2de" stroke-width="1.4" opacity="1.0"/>
-<text x="40" y="422" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="13.5" fill="#16202e" font-weight="bold" text-anchor="start">Traceability  ·  every theme links back to real employee voices</text>
-<rect x="70" y="442" width="300" height="96" rx="6" ry="6" fill="#eaeff7" stroke="#7f93b5" stroke-width="1.6" opacity="1.0"/>
-<text x="84" y="464" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="12" fill="#16202e" font-weight="bold" text-anchor="start">Theme</text>
-<text x="84" y="486" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="10.6" fill="#5a6473" font-weight="normal" text-anchor="start">"Positive Team Culture"</text>
-<text x="84" y="528" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="9.6" fill="#5a6473" font-weight="normal" text-anchor="start" font-style="italic">one of 7–12 themes</text>
-<rect x="470" y="442" width="420" height="96" rx="6" ry="6" fill="#eaeff7" stroke="#7f93b5" stroke-width="1.6" opacity="1.0"/>
-<text x="484" y="464" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="12" fill="#16202e" font-weight="bold" text-anchor="start">Built from codes</text>
-<text x="484" y="486" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="10.6" fill="#5a6473" font-weight="normal" text-anchor="start">team cohesion  ·  collegial support</text>
-<text x="484" y="502" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="10.6" fill="#5a6473" font-weight="normal" text-anchor="start">supportive atmosphere  ·  friendly colleagues</text>
-<text x="484" y="528" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="9.6" fill="#5a6473" font-weight="normal" text-anchor="start" font-style="italic">the codes grouped into this theme</text>
-<rect x="990" y="442" width="540" height="96" rx="6" ry="6" fill="#eaeff7" stroke="#7f93b5" stroke-width="1.6" opacity="1.0"/>
-<text x="1004" y="464" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="12" fill="#16202e" font-weight="bold" text-anchor="start">Grounded in answers</text>
-<text x="1004" y="486" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="10.6" fill="#5a6473" font-weight="normal" text-anchor="start">"Great team and exciting things ahead…"</text>
-<text x="1004" y="502" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="10.6" fill="#5a6473" font-weight="normal" text-anchor="start">"People here really help each other out…"</text>
-<text x="1004" y="528" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="9.6" fill="#5a6473" font-weight="normal" text-anchor="start" font-style="italic">actual anonymised answers, across several employees</text>
-<line x1="372" y1="490.0" x2="468" y2="490.0" stroke="#2b333d" stroke-width="2.0" marker-end="url(#ah-flow)"/>
-<text x="420.0" y="481.0" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="10.2" fill="#5a6473" font-weight="normal" text-anchor="middle" font-style="italic">made up of</text>
-<line x1="892" y1="490.0" x2="988" y2="490.0" stroke="#2b333d" stroke-width="2.0" marker-end="url(#ah-flow)"/>
-<text x="940.0" y="481.0" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="10.2" fill="#5a6473" font-weight="normal" text-anchor="middle" font-style="italic">each drawn from</text>
-<text x="40" y="570" font-family="'Segoe UI','Helvetica Neue',Arial,sans-serif" font-size="10.6" fill="#5a6473" font-weight="normal" text-anchor="start" font-style="italic">Built automatically: each theme remembers which codes formed it, and each code remembers which answers it came from, so HR can open any theme and read the exact words behind it.</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="1640" height="680" viewBox="0 0 1640 680" font-family="'Segoe UI', 'Helvetica Neue', Arial, sans-serif">
+  <defs>
+    <marker id="arr" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto"><path d="M0,0 L6.5,3 L0,6 Z" fill="#2b333d"/></marker>
+    <marker id="arrd" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto"><path d="M0,0 L6.5,3 L0,6 Z" fill="#54606e"/></marker>
+    <marker id="arrs" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#2b333d"/></marker>
+  </defs>
+
+  <rect x="0" y="0" width="1640" height="680" fill="#ffffff"/>
+
+  <!-- Title -->
+  <text x="22" y="32" font-size="20" font-weight="700" fill="#16202e">Qualitative Coding Pipeline &#183; Architecture</text>
+  <text x="22" y="54" font-size="12.5" fill="#5a6473">From interview transcripts to HR-ready themes, with every theme traceable back to the original employee answers.</text>
+  <text x="22" y="72" font-size="12.5" fill="#3f6fb0">Logic: per-interview coding &#8594; cross-interview consolidation &#8594; thematic analysis. Detail is progressively abstracted; evidence is preserved at every level.</text>
+
+  <!-- ============ TOP FLOW ROW: 8 boxes w174 h96 y122 pitch 200 start 32 ============ -->
+  <line x1="209" y1="170" x2="229" y2="170" stroke="#2b333d" stroke-width="2" marker-end="url(#arr)"/>
+  <line x1="409" y1="170" x2="429" y2="170" stroke="#2b333d" stroke-width="2" marker-end="url(#arr)"/>
+  <line x1="609" y1="170" x2="629" y2="170" stroke="#2b333d" stroke-width="2" marker-end="url(#arr)"/>
+  <line x1="809" y1="170" x2="829" y2="170" stroke="#2b333d" stroke-width="2" marker-end="url(#arr)"/>
+  <line x1="1009" y1="170" x2="1029" y2="170" stroke="#2b333d" stroke-width="2" marker-end="url(#arr)"/>
+  <line x1="1209" y1="170" x2="1229" y2="170" stroke="#2b333d" stroke-width="2" marker-end="url(#arr)"/>
+  <line x1="1409" y1="170" x2="1429" y2="170" stroke="#2b333d" stroke-width="2" marker-end="url(#arr)"/>
+
+  <!-- b0 Interview Transcripts -->
+  <rect x="32" y="122" width="174" height="96" rx="2" fill="#efefef" stroke="#8c8c8c" stroke-width="1.4"/>
+  <text x="119" y="162" font-size="12.5" font-weight="700" fill="#16202e" text-anchor="middle">Interview Transcripts</text>
+  <text x="119" y="180" font-size="9" fill="#5a6473" text-anchor="middle">Q&#38;A per employee</text>
+
+  <!-- b1 Anonymise -->
+  <rect x="232" y="122" width="174" height="96" rx="9" fill="#a4c2f4" stroke="#3f6fb0" stroke-width="1.6"/>
+  <circle cx="246" cy="135" r="8" fill="#2b333d"/><text x="246" y="138.5" font-size="9.5" font-weight="700" fill="#ffffff" text-anchor="middle">1</text>
+  <text x="319" y="160" font-size="12" font-weight="700" fill="#16202e" text-anchor="middle">Anonymise</text>
+  <text x="319" y="177" font-size="8.3" fill="#5a6473" text-anchor="middle">remove names, emails, phone numbers</text>
+  <text x="319" y="190" font-size="8.3" fill="#5a6473" text-anchor="middle">pair bot questions with employee answers</text>
+
+  <!-- b2 Per-Interview Coding (L2) -->
+  <rect x="432" y="122" width="174" height="96" rx="9" fill="#a4c2f4" stroke="#3f6fb0" stroke-width="1.6"/>
+  <circle cx="446" cy="135" r="8" fill="#2b333d"/><text x="446" y="138.5" font-size="9.5" font-weight="700" fill="#ffffff" text-anchor="middle">2</text>
+  <rect x="574" y="127" width="24" height="14" rx="5" fill="#ffffff" stroke="#3f6fb0" stroke-width="1.2"/><text x="586" y="137.5" font-size="9" font-weight="700" fill="#3f6fb0" text-anchor="middle">L2</text>
+  <text x="519" y="156" font-size="12" font-weight="700" fill="#16202e" text-anchor="middle">Per-Interview Coding</text>
+  <text x="519" y="172" font-size="8.3" fill="#5a6473" text-anchor="middle">one LLM call reads all Q&#38;A turns</text>
+  <text x="519" y="185" font-size="8.3" fill="#5a6473" text-anchor="middle">20-30 codes per interview</text>
+  <text x="519" y="200" font-size="7.8" font-style="italic" fill="#5a6473" text-anchor="middle">each code records its source turns</text>
+  <path d="M497,120 C497,105 541,105 541,120" fill="none" stroke="#54606e" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrd)"/>
+  <text x="519" y="100" font-size="9.5" font-style="italic" fill="#5a6473" text-anchor="middle">per interview</text>
+
+  <!-- b3 Cross-Interview Consolidation (L3) -->
+  <rect x="632" y="122" width="174" height="96" rx="9" fill="#a4c2f4" stroke="#3f6fb0" stroke-width="1.6"/>
+  <circle cx="646" cy="135" r="8" fill="#2b333d"/><text x="646" y="138.5" font-size="9.5" font-weight="700" fill="#ffffff" text-anchor="middle">3</text>
+  <rect x="774" y="127" width="24" height="14" rx="5" fill="#ffffff" stroke="#3f6fb0" stroke-width="1.2"/><text x="786" y="137.5" font-size="9" font-weight="700" fill="#3f6fb0" text-anchor="middle">L3</text>
+  <text x="719" y="158" font-size="11.5" font-weight="700" fill="#16202e" text-anchor="middle">Cross-Interview</text>
+  <text x="719" y="172" font-size="11.5" font-weight="700" fill="#16202e" text-anchor="middle">Consolidation</text>
+  <text x="719" y="187" font-size="8" fill="#5a6473" text-anchor="middle">merge similar codes across employees</text>
+  <text x="719" y="199" font-size="8.3" fill="#5a6473" text-anchor="middle">40-80 shared codes</text>
+
+  <!-- b4 Theme Clustering -->
+  <rect x="832" y="122" width="174" height="96" rx="9" fill="#a4c2f4" stroke="#3f6fb0" stroke-width="1.6"/>
+  <circle cx="846" cy="135" r="8" fill="#2b333d"/><text x="846" y="138.5" font-size="9.5" font-weight="700" fill="#ffffff" text-anchor="middle">4</text>
+  <text x="919" y="162" font-size="12" font-weight="700" fill="#16202e" text-anchor="middle">Theme Clustering</text>
+  <text x="919" y="179" font-size="8.5" fill="#5a6473" text-anchor="middle">group related codes</text>
+  <text x="919" y="192" font-size="8.5" fill="#5a6473" text-anchor="middle">7-12 themes</text>
+
+  <!-- b5 Per-Theme Synthesis -->
+  <rect x="1032" y="122" width="174" height="96" rx="9" fill="#a4c2f4" stroke="#3f6fb0" stroke-width="1.6"/>
+  <circle cx="1046" cy="135" r="8" fill="#2b333d"/><text x="1046" y="138.5" font-size="9.5" font-weight="700" fill="#ffffff" text-anchor="middle">5</text>
+  <text x="1119" y="158" font-size="12" font-weight="700" fill="#16202e" text-anchor="middle">Per-Theme Synthesis</text>
+  <text x="1119" y="175" font-size="8.3" fill="#5a6473" text-anchor="middle">category, tagline, narrative</text>
+  <text x="1119" y="188" font-size="8.5" fill="#5a6473" text-anchor="middle">paraphrased quotes</text>
+  <path d="M1097,120 C1097,105 1141,105 1141,120" fill="none" stroke="#54606e" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrd)"/>
+  <text x="1119" y="100" font-size="9.5" font-style="italic" fill="#5a6473" text-anchor="middle">per theme</text>
+
+  <!-- b6 Headline Synthesis -->
+  <rect x="1232" y="122" width="174" height="96" rx="9" fill="#a4c2f4" stroke="#3f6fb0" stroke-width="1.6"/>
+  <circle cx="1246" cy="135" r="8" fill="#2b333d"/><text x="1246" y="138.5" font-size="9.5" font-weight="700" fill="#ffffff" text-anchor="middle">6</text>
+  <text x="1319" y="162" font-size="12" font-weight="700" fill="#16202e" text-anchor="middle">Headline Synthesis</text>
+  <text x="1319" y="179" font-size="8.5" fill="#5a6473" text-anchor="middle">overall team narrative</text>
+  <text x="1319" y="192" font-size="8.5" fill="#5a6473" text-anchor="middle">note on what to protect</text>
+
+  <!-- b7 Report (HTML) -->
+  <rect x="1432" y="122" width="174" height="96" rx="2" fill="#efefef" stroke="#8c8c8c" stroke-width="1.4"/>
+  <text x="1519" y="162" font-size="12.5" font-weight="700" fill="#16202e" text-anchor="middle">Report (HTML)</text>
+  <text x="1519" y="179" font-size="8.5" fill="#5a6473" text-anchor="middle">findings with evidence</text>
+  <text x="1519" y="192" font-size="8.5" fill="#5a6473" text-anchor="middle">+ data lineage tab</text>
+
+  <!-- ============ ARROW LABELS ============ -->
+  <text x="419" y="236" font-size="10.2" font-style="italic" fill="#5a6473" text-anchor="middle">anonymised Q&#38;A turns</text>
+  <text x="619" y="236" font-size="10.2" font-style="italic" fill="#5a6473" text-anchor="middle">per-interview code sets (L2)</text>
+  <text x="819" y="236" font-size="10.2" font-style="italic" fill="#5a6473" text-anchor="middle">shared code set (L3)</text>
+  <text x="1019" y="236" font-size="10.2" font-style="italic" fill="#5a6473" text-anchor="middle">themed code groups</text>
+  <text x="1219" y="236" font-size="10.2" font-style="italic" fill="#5a6473" text-anchor="middle">cluster findings</text>
+
+  <!-- ============ STORE + write/read arrows ============ -->
+  <path d="M519,218 C519,256 545,266 560,297" fill="none" stroke="#54606e" stroke-width="1.4" stroke-dasharray="5,3.5" marker-end="url(#arrd)"/>
+  <path d="M719,218 C719,256 672,266 660,297" fill="none" stroke="#54606e" stroke-width="1.4" stroke-dasharray="5,3.5" marker-end="url(#arrd)"/>
+  <path d="M919,218 C919,255 800,270 780,297" fill="none" stroke="#54606e" stroke-width="1.4" stroke-dasharray="5,3.5" marker-end="url(#arrd)"/>
+  <text x="529" y="245" font-size="8.3" font-style="italic" fill="#54606e">L2 codes</text>
+  <text x="729" y="245" font-size="8.3" font-style="italic" fill="#54606e">L3 codes</text>
+  <text x="929" y="245" font-size="8.3" font-style="italic" fill="#54606e">clusters</text>
+
+  <path d="M850,330 C980,302 1045,250 1119,219" fill="none" stroke="#54606e" stroke-width="1.4" stroke-dasharray="6,4" marker-end="url(#arrd)"/>
+  <text x="1002" y="262" font-size="9" font-style="italic" fill="#54606e" text-anchor="middle">pull supporting quotes for narrative</text>
+
+  <path d="M430,300 L430,380 A210,14 0 0 0 850,380 L850,300" fill="#eaeff7" stroke="#7f93b5" stroke-width="1.4"/>
+  <ellipse cx="640" cy="300" rx="210" ry="14" fill="#eaeff7" stroke="#7f93b5" stroke-width="1.4"/>
+  <text x="640" y="322" font-size="13" font-weight="700" fill="#16202e" text-anchor="middle">Coded Data Store</text>
+  <text x="640" y="340" font-size="8.7" fill="#5a6473" text-anchor="middle">anonymised Q&#38;A &#183; L2 codes (per interview) &#183; L3 codes (shared) &#183; cluster assignments</text>
+  <text x="640" y="356" font-size="8.5" font-style="italic" fill="#5a6473" text-anchor="middle">full lineage preserved: every cluster traces to its source interview answers</text>
+
+  <!-- ============ LEGEND ============ -->
+  <rect x="1180" y="250" width="430" height="150" rx="6" fill="#ffffff" stroke="#c9d2dd" stroke-width="1.2"/>
+  <text x="1196" y="272" font-size="12" font-weight="700" fill="#16202e">Legend</text>
+  <line x1="1196" y1="293" x2="1224" y2="293" stroke="#2b333d" stroke-width="2" marker-end="url(#arrs)"/>
+  <text x="1232" y="296.5" font-size="10" fill="#5a6473">data flow</text>
+  <line x1="1196" y1="315" x2="1222" y2="315" stroke="#54606e" stroke-width="1.5" stroke-dasharray="5,3.5" marker-end="url(#arrd)"/>
+  <text x="1232" y="318.5" font-size="10" fill="#5a6473">writes to / reads from store</text>
+  <path d="M1198,340 C1198,330 1222,330 1222,340" fill="none" stroke="#54606e" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arrd)"/>
+  <text x="1232" y="343.5" font-size="10" fill="#5a6473">LLM called once per item</text>
+  <rect x="1400" y="285" width="22" height="13" rx="5" fill="#a4c2f4" stroke="#3f6fb0" stroke-width="1.4"/>
+  <text x="1430" y="295.5" font-size="10" fill="#5a6473">LLM step</text>
+  <rect x="1400" y="307" width="22" height="13" rx="2" fill="#efefef" stroke="#8c8c8c" stroke-width="1.2"/>
+  <text x="1430" y="317.5" font-size="10" fill="#5a6473">data in / out</text>
+  <ellipse cx="1411" cy="340" rx="11" ry="7" fill="#eaeff7" stroke="#7f93b5" stroke-width="1.2"/>
+  <text x="1430" y="343.5" font-size="10" fill="#5a6473">stored data</text>
+  <rect x="1400" y="356" width="22" height="13" rx="5" fill="#ffffff" stroke="#3f6fb0" stroke-width="1.2"/><text x="1411" y="366" font-size="8" font-weight="700" fill="#3f6fb0" text-anchor="middle">L#</text>
+  <text x="1430" y="366.5" font-size="10" fill="#5a6473">coding level</text>
+
+  <!-- ============ TRACEABILITY PANEL ============ -->
+  <rect x="22" y="408" width="1596" height="210" rx="8" fill="#ffffff" stroke="#c9d2dd" stroke-width="1.3"/>
+  <text x="40" y="434" font-size="13.5" font-weight="700" fill="#16202e">Traceability &#183; every theme links back to real employee voices</text>
+
+  <!-- A Theme -->
+  <rect x="38" y="452" width="240" height="108" rx="4" fill="#ffffff" stroke="#8c9bb0" stroke-width="1.2"/>
+  <text x="54" y="476" font-size="12" font-weight="700" fill="#16202e">Theme</text>
+  <text x="54" y="500" font-size="11" fill="#16202e">Positive Team Culture</text>
+  <text x="54" y="536" font-size="9" font-style="italic" fill="#5a6473">one of 7-12 themes, with</text>
+  <text x="54" y="548" font-size="9" font-style="italic" fill="#5a6473">tagline and narrative</text>
+
+  <text x="318" y="498" font-size="9.5" font-style="italic" fill="#5a6473" text-anchor="middle">made up of</text>
+  <line x1="282" y1="505" x2="354" y2="505" stroke="#2b333d" stroke-width="1.8" marker-end="url(#arrs)"/>
+
+  <!-- B L3 Codes -->
+  <rect x="358" y="452" width="300" height="108" rx="4" fill="#ffffff" stroke="#8c9bb0" stroke-width="1.2"/>
+  <text x="374" y="476" font-size="12" font-weight="700" fill="#16202e">L3 Codes</text>
+  <text x="374" y="500" font-size="10.5" fill="#16202e">team cohesion &#183; collegial support</text>
+  <text x="374" y="538" font-size="9" font-style="italic" fill="#5a6473">merged from L2 codes across employees</text>
+
+  <text x="698" y="498" font-size="9.5" font-style="italic" fill="#5a6473" text-anchor="middle">merged from</text>
+  <line x1="662" y1="505" x2="734" y2="505" stroke="#2b333d" stroke-width="1.8" marker-end="url(#arrs)"/>
+
+  <!-- C L2 Codes + Source -->
+  <rect x="738" y="452" width="360" height="108" rx="4" fill="#ffffff" stroke="#8c9bb0" stroke-width="1.2"/>
+  <text x="754" y="476" font-size="12" font-weight="700" fill="#16202e">L2 Codes + Source</text>
+  <text x="754" y="500" font-size="10.5" fill="#16202e">supportive atmosphere  (interview emp_03)</text>
+  <text x="754" y="538" font-size="9" font-style="italic" fill="#5a6473">each L2 code records which Q&#38;A turns it came from</text>
+
+  <text x="1128" y="498" font-size="9.5" font-style="italic" fill="#5a6473" text-anchor="middle">sourced from</text>
+  <line x1="1102" y1="505" x2="1154" y2="505" stroke="#2b333d" stroke-width="1.8" marker-end="url(#arrs)"/>
+
+  <!-- D Original Q&A -->
+  <rect x="1158" y="452" width="444" height="108" rx="4" fill="#ffffff" stroke="#8c9bb0" stroke-width="1.2"/>
+  <text x="1174" y="476" font-size="12" font-weight="700" fill="#16202e">Original Q&#38;A</text>
+  <text x="1174" y="498" font-size="10" fill="#16202e">Q: How do colleagues support each other?</text>
+  <text x="1174" y="513" font-size="10" fill="#16202e">A: People here really help each other out...</text>
+  <text x="1174" y="540" font-size="9" font-style="italic" fill="#5a6473">actual anonymised answers, across multiple employees</text>
+
+  <!-- footer -->
+  <text x="40" y="592" font-size="9.5" font-style="italic" fill="#5a6473">Drill-down is available in the report&#8217;s Data Lineage tab: Cluster &#8594; L3 &#8594; L2 &#8594; Q&#38;A.</text>
 </svg>
