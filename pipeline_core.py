@@ -13,7 +13,7 @@ import html as _html_mod
 import datetime
 
 # ── Fixed paths ───────────────────────────────────────────────────────────────
-CSV_PATH   = "pilot_transcripts.csv"
+INPUT_DIR  = "interview_input"
 KEYS_ENV   = "keys.env"
 OUTPUT_DIR = "pipeline_output"
 
@@ -25,6 +25,11 @@ CONFIG = {
     "L2_CODES_RANGE":  (20, 30),
     "L3_CODES_RANGE":  (40, 80),
     "CLUSTERS_RANGE":  (7, 12),
+    # ── Input ─────────────────────────────────────────────────────────────────
+    # Set INPUT_FILE to the filename inside interview_input/.
+    # Set INPUT_FORMAT to the matching parser key (see _PARSERS below).
+    "INPUT_FILE":      "the-office-2.csv",
+    "INPUT_FORMAT":    "spradley_v2",
 }
 
 
@@ -46,7 +51,7 @@ def call_llm(prompt: str, system: str = "You are a qualitative research assistan
         for attempt in range(5):
             try:
                 resp = client.messages.create(
-                    model=_model, max_tokens=2048,
+                    model=_model, max_tokens=8192,
                     temperature=_temperature,
                     system=system,
                     messages=[{"role": "user", "content": prompt}]
@@ -80,23 +85,19 @@ def call_llm(prompt: str, system: str = "You are a qualitative research assistan
 
 # ── C3: Data ingestion ────────────────────────────────────────────────────────
 
-def load_interviews(csv_path: str = CSV_PATH) -> list:
-    """Load and validate CSV → standardised interviews list."""
-    import pandas as pd
-    df = pd.read_csv(csv_path)
-
+def _parse_legacy(df: "pd.DataFrame") -> list:
+    """Parser for the original pilot_transcripts.csv format.
+    Columns: session_id, turn_number, speaker (User/Bot), message.
+    Bot message at turn N-1 becomes the question for User turn N.
+    """
     required = {"session_id", "turn_number", "speaker", "message"}
     missing  = required - set(df.columns)
     if missing:
-        raise ValueError(f"CSV missing columns: {missing}")
-    if df["session_id"].isnull().any():
-        raise ValueError("CSV contains null session_id values")
-    if not (df["turn_number"] > 0).all():
-        raise ValueError("turn_number must be positive integers")
+        raise ValueError(f"CSV missing columns for 'legacy' format: {missing}")
 
     interviews = []
     for interview_id, group in df.groupby("session_id"):
-        group = group.sort_values("turn_number")
+        group    = group.sort_values("turn_number")
         bot_msgs = {
             int(row["turn_number"]): row["message"]
             for _, row in group.iterrows()
@@ -110,12 +111,73 @@ def load_interviews(csv_path: str = CSV_PATH) -> list:
             question = bot_msgs.get(turn - 1, "[initial mood opener]")
             qa_pairs.append({"turn_number": turn, "question": question,
                               "answer": str(row["message"])})
-        if not qa_pairs:
-            raise ValueError(f"Interview {interview_id} has no User turns")
-        interviews.append({"interview_id": interview_id, "qa_pairs": qa_pairs})
+        if qa_pairs:
+            interviews.append({"interview_id": interview_id, "qa_pairs": qa_pairs})
+    return interviews
+
+
+def _parse_spradley_v2(df: "pd.DataFrame") -> list:
+    """Parser for the Spradley platform export format (e.g. the-office-2.csv).
+    Columns include: employee_id, thread, turn_index, question_asked,
+    answer_text, is_skipped, participant_status, is_test.
+    Each non-skipped row with a non-empty answer becomes one Q&A pair.
+    """
+    required = {"employee_id", "thread", "turn_index", "question_asked",
+                "answer_text", "is_skipped", "participant_status", "is_test"}
+    missing  = required - set(df.columns)
+    if missing:
+        raise ValueError(f"CSV missing columns for 'spradley_v2' format: {missing}")
+
+    df = df[
+        (df["participant_status"] == "completed") &
+        (df["is_test"].astype(str).str.lower() != "true") &
+        (df["is_skipped"].astype(str).str.lower() != "true") &
+        (df["answer_text"].notna()) &
+        (df["answer_text"].astype(str).str.strip() != "")
+    ].copy()
+
+    interviews = []
+    for interview_id, group in df.groupby("employee_id"):
+        group    = group.sort_values(["thread", "turn_index"])
+        qa_pairs = []
+        for turn_number, (_, row) in enumerate(group.iterrows(), start=1):
+            qa_pairs.append({
+                "turn_number": turn_number,
+                "question":    str(row["question_asked"]),
+                "answer":      str(row["answer_text"]),
+            })
+        if qa_pairs:
+            interviews.append({"interview_id": str(interview_id), "qa_pairs": qa_pairs})
+    return interviews
+
+
+_PARSERS = {
+    "legacy":       _parse_legacy,
+    "spradley_v2":  _parse_spradley_v2,
+}
+
+
+def load_interviews() -> list:
+    """Load interviews from interview_input/ using CONFIG["INPUT_FILE"] and CONFIG["INPUT_FORMAT"].
+    Returns the standardised interviews list consumed by all downstream cells.
+    To add a new format: write a _parse_<name>(df) function and register it in _PARSERS.
+    """
+    import pandas as pd
+
+    fmt      = CONFIG.get("INPUT_FORMAT", "legacy")
+    filename = CONFIG.get("INPUT_FILE", "")
+    path     = os.path.join(INPUT_DIR, filename)
+
+    if fmt not in _PARSERS:
+        raise ValueError(f"Unknown INPUT_FORMAT {fmt!r}. Available: {list(_PARSERS)}")
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"Input file not found: {path}")
+
+    df = pd.read_csv(path)
+    interviews = _PARSERS[fmt](df)
 
     if not interviews:
-        raise ValueError("No interviews loaded — check csv_path")
+        raise ValueError(f"No interviews loaded from {path!r} with format {fmt!r}")
     return interviews
 
 
@@ -142,7 +204,16 @@ def parse_json_safe(text: str) -> dict:
         text  = "\n".join(lines[1:])
         if text.endswith("```"):
             text = text[:-3].strip()
-    return json.loads(text)
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError as e:
+        preview = text[:200] + ("..." if len(text) > 200 else "")
+        raise json.JSONDecodeError(
+            f"{e.msg} — LLM output truncated or malformed "
+            f"(got {len(text)} chars, likely hit max_tokens). "
+            f"Preview: {preview!r}",
+            e.doc, e.pos
+        ) from None
 
 
 # ── C6: L2 Per-interview Coder ───────────────────────────────────────────────
