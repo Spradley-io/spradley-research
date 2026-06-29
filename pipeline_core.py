@@ -24,7 +24,7 @@ CONFIG = {
     "LLM_TEMPERATURE": 0.2,
     "L2_CODES_RANGE":  (20, 30),
     "L3_CODES_RANGE":  (40, 80),
-    "CLUSTERS_RANGE":  (7, 12),
+    "CLUSTERS_RANGE":  (4, 6),
     # ── Input ─────────────────────────────────────────────────────────────────
     # Set INPUT_FILE to the filename inside interview_input/.
     # Set INPUT_FORMAT to the matching parser key (see _PARSERS below).
@@ -219,6 +219,17 @@ def parse_json_safe(text: str) -> dict:
         ) from None
 
 
+def _strip_em_dashes(obj):
+    """Recursively replace em dashes in all string values of a parsed LLM result."""
+    if isinstance(obj, dict):
+        return {k: _strip_em_dashes(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_strip_em_dashes(v) for v in obj]
+    if isinstance(obj, str):
+        return obj.replace('—', ' -').replace('–', '-')
+    return obj
+
+
 # ── C6: L2 Per-interview Coder ───────────────────────────────────────────────
 
 PROMPT_L2_DIRECT = (
@@ -360,9 +371,13 @@ def cluster_l3_codes(l3_list: list) -> dict:
         clusters_min=clusters_min, clusters_max=clusters_max,
         l3_codes_list=l3_list_str
     )
-    raw    = call_llm(prompt)
-    result = parse_json_safe(raw)
-    return {cl["name"]: cl["codes"] for cl in result["clusters"]}
+    raw      = call_llm(prompt)
+    result   = parse_json_safe(raw)
+    clusters = result["clusters"]
+    if len(clusters) > clusters_max:
+        clusters.sort(key=lambda c: len(c.get("codes", [])), reverse=True)
+        clusters = clusters[:clusters_max]
+    return {cl["name"]: cl["codes"] for cl in clusters}
 
 
 # ── C9: LLM Explainer ────────────────────────────────────────────────────────
@@ -396,25 +411,27 @@ PROMPT_FINDING = (
     "  - Sentence 1: restate the answer directly (the conclusion in one line).\n"
     "  - Sentence 2: cite 1-2 specific evidence patterns from the responses above.\n"
     "  - Sentence 3: state the business implication or the action priority.\n"
+    "  - Keep each sentence under 20 words. Split compound thoughts into two sentences.\n"
     "  - No filler openers ('The data shows...', 'It appears that...'). State claims directly.\n"
     "  - If evidence is mixed, sentence 2 must name both directions explicitly.\n"
     "  - Ground every claim in the cited responses. If only some employees mentioned something,\n"
     "    say 'some' or 'a few', not 'employees' or 'the team'.\n"
-    "tension (optional -- set null in most cases):\n"
-    "  - Include ONLY when the responses above reveal a genuine co-existing tension: the same\n"
-    "    people simultaneously want or experience two contradictory things.\n"
-    "  - This is NOT variation ('some feel X, others feel Y') and NOT a mixed picture.\n"
-    "  - It IS a tension when people express both sides themselves -- e.g. wanting more\n"
-    "    involvement in decisions while also feeling overwhelmed by too many meetings.\n"
-    "  - Both sides of the contradiction must be clearly present in the cited responses.\n"
-    "  - If genuine: one sentence only. State both sides plainly. No dramatic openers.\n"
-    "  - When in doubt, set null. Fewer is better -- only flag real tensions.\n"
+    "tension (one sentence if a genuine internal conflict exists in this cluster -- else null):\n"
+    "  - Include when the responses show employees simultaneously experiencing two opposing things\n"
+    "    within this cluster -- e.g. valuing the team while fearing for their jobs, or wanting\n"
+    "    more feedback while also feeling overwhelmed by meetings.\n"
+    "  - Both sides must be evidenced in the cited responses above.\n"
+    "  - This is common in mixed and needs_work clusters -- do not default to null reflexively.\n"
+    "  - If present: one sentence only, max 20 words. State both sides plainly. No dramatic openers.\n"
+    "  - Only set null when there is genuinely no co-existing contradiction in the data.\n"
     "quotes:\n"
     "  - 2-3 paraphrases, as specific and concrete as possible. Prefer concrete over abstract.\n"
     "  - Strip filler words ('you know', 'like', 'I mean'). Preserve meaning and anonymity.\n"
     "tag: 1-2 word theme label e.g. Culture, Development, Wellbeing.\n"
-    "Never use em dashes, dramatic openers ('The tension is acute:', 'This reveals a divide:',\n"
-    "'The stakes are high:'), or AI-sounding framing. Write plainly.\n"
+    "Write in short declarative sentences. End each thought with a period. "
+    "Never use em dashes or parenthetical asides -- if a clause needs an em dash, make it its own sentence. "
+    "No dramatic openers ('The tension is acute:', 'This reveals a divide:', 'The stakes are high:'). "
+    "Write the way a senior consultant would brief a CEO: plain, direct, evidence-first.\n"
     "Return only valid JSON. No other text."
 )
 
@@ -434,11 +451,10 @@ PROMPT_EXPERIMENTS = (
     '   "source_cluster": "exact finding name from the list above",\n'
     '   "insight": "1-2 sentences: which finding this addresses and why it matters for that team.",\n'
     '   "try_this": "The concrete action: what to do, how often, who does it. One paragraph.",\n'
-    '   "working_when": "One sentence: the observable change that signals this is working.",\n'
     '   "tag": "theme label e.g. Culture, Development"}},\n'
     "  ...\n"
     "]}}\n\n"
-    "Never use em dashes in any text.\n"
+    "Write in short declarative sentences. No em dashes. No parenthetical asides.\n"
     "Return only valid JSON. No other text."
 )
 
@@ -449,7 +465,7 @@ def explain_cluster(name: str, l3_codes: list, qa_pairs_text: str) -> dict:
         cluster_name=name, codes_list=codes_list, qa_pairs_text=qa_pairs_text
     )
     raw = call_llm(prompt)
-    return parse_json_safe(raw)
+    return _strip_em_dashes(parse_json_safe(raw))
 
 def propose_experiments(needs_attention: list, max_n: int | None = None) -> list:
     """Generate experiment proposals for needs_work and mixed clusters.
@@ -515,28 +531,24 @@ def score_dimensions_one_interview(interview_id_prefix: str, qa_entries: list) -
 
 
 PROMPT_HEADLINE = (
-    "You are a senior HR consultant writing the opening and closing narrative for a management briefing "
-    "on employee satisfaction. Write in the style of a top-tier strategy consulting firm.\n\n"
-    "Use the SCQA structure across the opening (headline field):\n"
-    "  - Situation (paragraph 1): one grounding sentence setting the context "
-    "(e.g. 'This team of N employees was interviewed about...'). Then 1-2 sentences on the broad picture.\n"
-    "  - Complication (paragraph 2): the key tension or surprise the findings reveal. "
-    "What is most concerning or unexpected?\n"
-    "  - Question + Answer (paragraph 3): state the implicit management question, then give your synthesis "
-    "and main recommendation. Put the answer first -- do not build to it.\n"
-    "Keep paragraphs tight (2-3 sentences each). No superlatives. No filler. "
-    "No dramatic openers or AI-sounding phrasing ('The tension is clear:', 'This signals a crisis:'). "
-    "Do not list findings -- tell a story. Ground every claim in the evidence below.\n\n"
+    "You are a senior HR consultant writing the opening paragraph of a management briefing.\n\n"
+    "Write exactly 2 sentences:\n"
+    "  - Sentence 1: the single most important pattern in what employees report. "
+    "Frame it as what employees experience, feel, or say -- not as a judgement of management behavior. "
+    "State it as a factual observation from the data.\n"
+    "  - Sentence 2: the one action priority this data points to. "
+    "Frame it as a recommendation or opportunity, not a command. "
+    "Use 'should', 'could', or 'the priority is' -- never 'must', 'immediately', or 'withholding'.\n\n"
+    "Rules: No scene-setting. No listing of findings. "
+    "The detailed findings are in the report below -- this is the elevator pitch only. "
+    "Never attribute blame or negative motive to managers. "
+    "Write in short declarative sentences under 25 words each. "
+    "No em dashes or parenthetical asides. "
+    "No dramatic openers. Ground every claim in the evidence below.\n\n"
     "Number of employees interviewed: {n_interviews}\n\n"
     "Findings:\n"
     "{findings_text}\n\n"
-    "Return valid JSON with exactly two string fields:\n"
-    '  "headline": 3 paragraphs following the SCQA structure above. '
-    "Separate paragraphs with a newline character.\n"
-    '  "note_to_protect": 1-2 paragraphs identifying what is genuinely positive and specific '
-    "in the data and why it matters. Grounded, not cheerleading.\n\n"
-    'Return format: {{"headline": "...", "note_to_protect": "..."}}\n\n'
-    "Never use em dashes in any text.\n"
+    'Return format: {{"headline": "sentence 1. sentence 2."}}\n\n'
     "Return only valid JSON. No other text."
 )
 
@@ -561,7 +573,7 @@ def generate_headline(clusters: dict, n_interviews: int, model: str) -> dict:
     findings_text = "\n\n---\n\n".join(parts)
     prompt = PROMPT_HEADLINE.format(n_interviews=n_interviews, findings_text=findings_text)
     raw    = call_llm(prompt, model=model)
-    return parse_json_safe(raw)
+    return _strip_em_dashes(parse_json_safe(raw))
 
 
 # ── C11 / C12: HTML report generation ────────────────────────────────────────
@@ -704,13 +716,10 @@ APP_CSS = (
     ".topics-intro{font-size:13px;color:#666;margin-bottom:16px;line-height:1.6;max-width:640px}\n"
     ".topics-svg{width:100%;height:auto;display:block}\n"
     ".radar-wrap{max-width:560px;margin:0 auto;position:relative}\n"
-    "#radar-tooltip{position:absolute;background:#fff;border:1px solid #e5e7eb;border-radius:6px;"
-    "padding:10px 14px;font-size:12px;line-height:1.6;color:#333;"
-    "box-shadow:0 2px 8px rgba(0,0,0,0.10);pointer-events:none;display:none;"
-    "max-width:220px;z-index:10}\n"
-    "#radar-tooltip strong{display:block;font-size:13px;margin-bottom:4px;color:#111}\n"
-    "#radar-tooltip .rt-pct{font-size:15px;font-weight:700;color:#4f8ef7;margin-bottom:6px;display:block}\n"
-    "#radar-tooltip .rt-def{color:#666;font-size:11px;line-height:1.5}\n"
+    "#shared-tip{position:fixed;background:#1e293b;color:#f8fafc;border-radius:8px;"
+    "padding:10px 14px;font-size:12px;line-height:1.5;"
+    "box-shadow:0 4px 20px rgba(0,0,0,0.35);pointer-events:none;display:none;"
+    "max-width:280px;z-index:9999}\n"
 )
 
 
@@ -905,18 +914,13 @@ def _rpt_insight(n: int, name: str, data: dict, n_iv: int = 0) -> str:
 
 def _rpt_exp(n: int, exp: dict) -> str:
     """Render one experiment block in the document-style report tab."""
-    title        = H(exp.get("title", ""))
-    insight      = H(exp.get("insight") or exp.get("summary", ""))
-    try_this     = H(exp.get("try_this") or exp.get("rationale", ""))
-    working_when = H(exp.get("working_when", ""))
-    ww_block = (
-        f'<p class="rpt-body"><strong>You\'ll know it\'s working when</strong> {working_when}</p>'
-    ) if working_when else ""
+    title    = H(exp.get("title", ""))
+    insight  = H(exp.get("insight") or exp.get("summary", ""))
+    try_this = H(exp.get("try_this") or exp.get("rationale", ""))
     return (
         f'<h3 class="rpt-exp-title">Experiment {n}: {title}</h3>'
         f'<p class="rpt-body"><strong>The insight:</strong> {insight}</p>'
         f'<p class="rpt-body"><strong>Try this:</strong> {try_this}</p>'
-        f'{ww_block}'
         f'<hr class="rpt-hr">'
     )
 
@@ -944,10 +948,39 @@ def _bubble_pane(clusters: dict, lineage: dict, global_store: dict,
             ivs |= l2_to_ivs.get(l2c, set())
         l3_to_count[l3c] = len(ivs)
 
-    filtered = [(l3c, cnt) for l3c, cnt in l3_to_count.items()
-                if n_iv and cnt / n_iv > 0.10]
+    MAX_BUBBLES = 16
+    ZONE_MAX    = 6
+
+    # Group all topics by zone category
+    all_by_cat: dict = {"needs_work": [], "mixed": [], "working_well": []}
+    for l3c, cnt in l3_to_count.items():
+        if not cnt:
+            continue
+        cname = l3_to_cluster.get(l3c, "")
+        cat   = clusters.get(cname, {}).get("category", "mixed")
+        all_by_cat[cat].append((l3c, cnt))
+
+    if not any(all_by_cat.values()):
+        return '<p class="topics-intro">No topic data available.</p>'
+
+    # Primary: topics above 5% coverage per zone.
+    # Displayed percentages still round to nearest 10% for anonymity.
+    by_cat: dict = {cat: [] for cat in all_by_cat}
+    for cat, topics in all_by_cat.items():
+        by_cat[cat] = [(l3c, cnt) for l3c, cnt in topics if n_iv and cnt / n_iv > 0.05]
+        # Fallback: empty zone gets its top-2 topics regardless of threshold
+        if not by_cat[cat]:
+            by_cat[cat] = sorted(topics, key=lambda x: -x[1])[:2]
+
+    # Per-zone cap, then global cap trimming from smallest
+    filtered: list = []
+    for cat, topics in by_cat.items():
+        filtered.extend(sorted(topics, key=lambda x: -x[1])[:ZONE_MAX])
+    filtered.sort(key=lambda x: -x[1])
+    filtered = filtered[:MAX_BUBBLES]
+
     if not filtered:
-        return '<p class="topics-intro">No topics met the 10% coverage threshold.</p>'
+        return '<p class="topics-intro">No topics available to display.</p>'
 
     counts  = [cnt for _, cnt in filtered]
     min_cnt = min(counts)
@@ -960,20 +993,30 @@ def _bubble_pane(clusters: dict, lineage: dict, global_store: dict,
         t = math.sqrt((cnt - min_cnt) / (max_cnt - min_cnt))
         return R_MIN + t * (R_MAX - R_MIN)
 
-    SVG_W, SVG_H = 900, 560
+    SVG_W, SVG_H = 900, 520
     AXIS_Y = SVG_H - 38
     x_bands_px = {
         "needs_work":   (int(SVG_W * 0.09), int(SVG_W * 0.32)),
         "mixed":        (int(SVG_W * 0.36), int(SVG_W * 0.64)),
         "working_well": (int(SVG_W * 0.67), int(SVG_W * 0.91)),
     }
-    colors = {
-        "working_well": ("#16a34a", "rgba(22,163,74,0.13)"),
-        "needs_work":   ("#dc2626", "rgba(220,38,38,0.13)"),
-        "mixed":        ("#d97706", "rgba(217,119,6,0.13)"),
+    # RGB components for dynamic fill opacity
+    color_strokes = {
+        "working_well": ("#16a34a", "22,163,74"),
+        "needs_work":   ("#dc2626", "220,38,38"),
+        "mixed":        ("#d97706", "217,119,6"),
     }
 
-    DROP_R = 24   # bubbles below this radius have no useful label -- drop them
+    # Pre-group by zone so y positions are distributed relative to each zone's own count
+    zone_order: dict = {"needs_work": [], "mixed": [], "working_well": []}
+    for l3c, cnt in sorted(filtered, key=lambda x: -x[1]):
+        cname = l3_to_cluster.get(l3c, "")
+        cat   = clusters.get(cname, {}).get("category", "mixed")
+        zone_order[cat].append((l3c, cnt))
+
+    y_lo = R_MAX + 30
+    y_hi = AXIS_Y - R_MAX - 20
+
     rng = random.Random(42)
     bubbles = []
     for l3c, cnt in sorted(filtered, key=lambda x: -x[1]):
@@ -981,15 +1024,25 @@ def _bubble_pane(clusters: dict, lineage: dict, global_store: dict,
         cat      = clusters.get(cname, {}).get("category", "mixed")
         xlo, xhi = x_bands_px.get(cat, (int(SVG_W * 0.36), int(SVG_W * 0.64)))
         r        = _r(cnt)
-        if r < DROP_R:
-            continue
         cx_init  = rng.uniform(xlo + r, xhi - r)
-        cy_frac  = 1 - (cnt - min_cnt) / max((max_cnt - min_cnt), 1)
-        cy_init  = R_MAX + 20 + cy_frac * (AXIS_Y - R_MAX - 60 - r)
-        pct      = round(cnt / n_iv * 10) * 10
-        stroke, fill = colors.get(cat, ("#888", "rgba(136,136,136,0.13)"))
+        zone_list = zone_order[cat]
+        idx       = zone_list.index((l3c, cnt))
+        n_zone    = len(zone_list)
+        # Center bubbles vertically; step outward symmetrically so 2 bubbles sit
+        # near the middle rather than at the extremes of the SVG.
+        STEP      = 80
+        y_center  = (y_lo + y_hi) / 2
+        cy_init   = y_center if n_zone == 1 else y_center + (idx - (n_zone - 1) / 2) * STEP
+        pct       = round(cnt / n_iv * 10) * 10
+        stroke, rgb = color_strokes.get(cat, ("#888", "136,136,136"))
+        # Fill opacity proportional to radius: small=0.08, large=0.26
+        r_frac     = (r - R_MIN) / max(R_MAX - R_MIN, 1)
+        fill_alpha = round(0.08 + r_frac * 0.18, 2)
+        fill       = f"rgba({rgb},{fill_alpha})"
+        tagline = clusters.get(cname, {}).get("tagline", "")
         bubbles.append({
-            "code": l3c, "r": r, "pct": pct,
+            "code": l3c, "r": r, "pct": pct, "cluster": cname, "tagline": tagline,
+            "cat": cat,
             "cx": cx_init, "cy": cy_init,
             "xlo": xlo, "xhi": xhi,
             "stroke": stroke, "fill": fill,
@@ -1042,11 +1095,25 @@ def _bubble_pane(clusters: dict, lineage: dict, global_store: dict,
             f'fill="{b["stroke"]}" opacity="0.8" '
             f'stroke="white" stroke-width="2" paint-order="stroke fill">~{b["pct"]}%</text>'
         )
+        # Cluster name: small italic label below pct for larger bubbles
+        if r >= 28 and b.get("cluster"):
+            clabel = b["cluster"]
+            if len(clabel) > 22:
+                clabel = clabel[:20] + "..."
+            text_el += (
+                f'<text x="{b["cx"]:.1f}" y="{pct_y + fs_pct + 1:.1f}" '
+                f'text-anchor="middle" font-size="6" font-family="Arial,sans-serif" '
+                f'fill="{b["stroke"]}" opacity="0.55" font-style="italic" '
+                f'stroke="white" stroke-width="1.5" paint-order="stroke fill">{H(clabel)}</text>'
+            )
 
         circle_els += (
             f'<g class="bbl" '
             f'data-cx="{b["cx"]:.1f}" data-cy="{b["cy"]:.1f}" data-r="{r:.1f}" '
-            f'data-xmin="{b["xlo"]}" data-xmax="{b["xhi"]}">'
+            f'data-xmin="{b["xlo"]}" data-xmax="{b["xhi"]}" '
+            f'data-topic="{H(b["code"])}" data-cluster="{H(b["cluster"])}" '
+            f'data-tagline="{H(b.get("tagline", ""))}" '
+            f'data-pct="{b["pct"]}" data-cat="{b.get("cat", "mixed")}">'
             f'{circle_el}{text_el}</g>'
         )
 
@@ -1085,7 +1152,7 @@ def _bubble_pane(clusters: dict, lineage: dict, global_store: dict,
         "for(var j=i+1;j<D.length;j++){"
         "var dx=D[j][0]-D[i][0],dy=D[j][1]-D[i][1];"
         "var dist=Math.sqrt(dx*dx+dy*dy)||0.01;"
-        "var mn=D[i][2]+D[j][2]+18;"
+        "var mn=D[i][2]+D[j][2]+6;"
         "if(dist<mn){"
         "var push=(mn-dist)/2,nx=dx/dist,ny=dy/dist;"
         "D[i][0]-=nx*push;D[i][1]-=ny*push;"
@@ -1109,10 +1176,48 @@ def _bubble_pane(clusters: dict, lineage: dict, global_store: dict,
         "})();"
     )
 
+    tip_js = (
+        "(function(){"
+        "function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}"
+        "var tip=document.getElementById('shared-tip');"
+        "if(!tip){"
+        "tip=document.createElement('div');tip.id='shared-tip';"
+        "document.body.appendChild(tip);}"
+        "var catL={'needs_work':'Needs Work','mixed':'Mixed Signals','working_well':'Working Well'};"
+        "var catC={'needs_work':'#fca5a5','mixed':'#fcd34d','working_well':'#86efac'};"
+        "document.querySelectorAll('.bbl').forEach(function(g){"
+        "g.style.cursor='pointer';"
+        "g.addEventListener('mouseenter',function(){"
+        "var t=esc(g.dataset.topic||'');"
+        "var cl=esc(g.dataset.cluster||'');"
+        "var tg=esc(g.dataset.tagline||'');"
+        "var pct=g.dataset.pct||'';"
+        "var cat=g.dataset.cat||'mixed';"
+        "var color=catC[cat]||'#94a3b8';"
+        "var label=catL[cat]||cat;"
+        "var h='';"
+        "if(cl)h+='<div style=\"font-weight:700;font-size:14px;margin-bottom:3px\">'+cl+'</div>';"
+        "h+='<div style=\"font-size:10px;font-weight:600;color:'+color+';text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px\">'+label+'</div>';"
+        "if(tg)h+='<div style=\"font-size:12px;font-style:italic;color:#cbd5e1;border-top:1px solid #334155;padding-top:7px;margin-bottom:7px\">'+tg+'</div>';"
+        "h+='<div style=\"font-size:11px;color:#64748b\">Topic: '+t+'</div>';"
+        "h+='<div style=\"font-size:11px;color:#4f8ef7;margin-top:3px\">~'+pct+'% of participants</div>';"
+        "tip.innerHTML=h;tip.style.display='block';"
+        "});"
+        "g.addEventListener('mousemove',function(e){"
+        "var x=e.clientX+14,y=e.clientY-10;"
+        "if(x+295>window.innerWidth)x=e.clientX-295-14;"
+        "tip.style.left=x+'px';tip.style.top=y+'px';"
+        "});"
+        "g.addEventListener('mouseleave',function(){tip.style.display='none';});"
+        "});"
+        "})();"
+    )
+
     return (
         f'<svg viewBox="0 0 {SVG_W} {SVG_H}" class="topics-svg">'
         f'{circle_els}{axis}</svg>'
         f'<script>{js}</script>'
+        f'<script>{tip_js}</script>'
     )
 
 
@@ -1242,26 +1347,25 @@ def _radar_pane(dimension_store: dict, n_iv: int) -> str:
 
     js = (
         "(function(){"
-        "var wrap=document.querySelector('.radar-wrap');"
-        "if(!wrap)return;"
-        "var tip=document.createElement('div');"
-        "tip.id='radar-tooltip';wrap.appendChild(tip);"
+        "var tip=document.getElementById('shared-tip');"
+        "if(!tip){"
+        "tip=document.createElement('div');tip.id='shared-tip';"
+        "document.body.appendChild(tip);}"
         f"var DIM={_json.dumps(dim_data)};"
         "document.querySelectorAll('.radar-hit').forEach(function(el){"
+        "el.style.cursor='pointer';"
         "el.addEventListener('mouseenter',function(e){"
         "var d=DIM[el.dataset.dim];if(!d)return;"
-        "tip.innerHTML='<strong>'+d.label+'</strong>"
-        "<span class=\"rt-pct\">~'+d.pct+'% of participants</span>"
-        "<span class=\"rt-def\">'+d.def+'</span>';"
-        "tip.style.display='block';"
-        "var rect=wrap.getBoundingClientRect();"
-        "tip.style.left=(e.clientX-rect.left+12)+'px';"
-        "tip.style.top=(e.clientY-rect.top-10)+'px';"
+        "var h='';"
+        "h+='<div style=\"font-weight:700;font-size:14px;margin-bottom:3px\">'+d.label+'</div>';"
+        "h+='<div style=\"font-size:15px;font-weight:700;color:#4f8ef7;margin-bottom:6px\">~'+d.pct+'% of participants</div>';"
+        "h+='<div style=\"font-size:11px;color:#94a3b8;border-top:1px solid #334155;padding-top:6px\">'+d.def+'</div>';"
+        "tip.innerHTML=h;tip.style.display='block';"
         "});"
         "el.addEventListener('mousemove',function(e){"
-        "var rect=wrap.getBoundingClientRect();"
-        "tip.style.left=(e.clientX-rect.left+12)+'px';"
-        "tip.style.top=(e.clientY-rect.top-10)+'px';"
+        "var x=e.clientX+14,y=e.clientY-10;"
+        "if(x+295>window.innerWidth)x=e.clientX-295-14;"
+        "tip.style.left=x+'px';tip.style.top=y+'px';"
         "});"
         "el.addEventListener('mouseleave',function(){"
         "tip.style.display='none';});"
@@ -1330,14 +1434,6 @@ def build_report_html(
         )
         for idx, exp in enumerate(experiments, 1):
             report += _rpt_exp(idx, exp)
-
-    # A note on what to protect
-    note_text = global_store.get("note_to_protect", "")
-    if note_text:
-        note_paras = [p.strip() for p in note_text.split("\n") if p.strip()]
-        report += f'<h2 class="rpt-sec">A note on what to protect</h2>'
-        report += "".join(f'<p class="rpt-body">{H(p)}</p>' for p in note_paras)
-        report += '<hr class="rpt-hr">'
 
     # Methodology block
     report += (
