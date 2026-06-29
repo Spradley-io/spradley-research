@@ -380,6 +380,7 @@ PROMPT_FINDING = (
     '  "category": "working_well",\n'
     '  "tagline": "...",\n'
     '  "summary": "...",\n'
+    '  "tension": null,\n'
     '  "quotes": ["...", "..."],\n'
     '  "tag": "..."\n'
     '}}\n\n'
@@ -399,6 +400,15 @@ PROMPT_FINDING = (
     "  - If evidence is mixed, sentence 2 must name both directions explicitly.\n"
     "  - Ground every claim in the cited responses. If only some employees mentioned something,\n"
     "    say 'some' or 'a few', not 'employees' or 'the team'.\n"
+    "tension (optional -- set null in most cases):\n"
+    "  - Include ONLY when the responses above reveal a genuine co-existing tension: the same\n"
+    "    people simultaneously want or experience two contradictory things.\n"
+    "  - This is NOT variation ('some feel X, others feel Y') and NOT a mixed picture.\n"
+    "  - It IS a tension when people express both sides themselves -- e.g. wanting more\n"
+    "    involvement in decisions while also feeling overwhelmed by too many meetings.\n"
+    "  - Both sides of the contradiction must be clearly present in the cited responses.\n"
+    "  - If genuine: one sentence only. State both sides plainly. No dramatic openers.\n"
+    "  - When in doubt, set null. Fewer is better -- only flag real tensions.\n"
     "quotes:\n"
     "  - 2-3 paraphrases, as specific and concrete as possible. Prefer concrete over abstract.\n"
     "  - Strip filler words ('you know', 'like', 'I mean'). Preserve meaning and anonymity.\n"
@@ -683,6 +693,9 @@ APP_CSS = (
     ".rpt-accent-ww{border-left:3px solid #16a34a;padding-left:14px;margin-bottom:18px}\n"
     ".rpt-accent-nw{border-left:3px solid #dc2626;padding-left:14px;margin-bottom:18px}\n"
     ".rpt-accent-mx{border-left:3px solid #d97706;padding-left:14px;margin-bottom:18px}\n"
+    ".rpt-tension-label{font-size:10px;font-weight:700;text-transform:uppercase;"
+    "letter-spacing:.6px;color:#aaa;margin:10px 0 3px}\n"
+    ".rpt-tension{font-size:13px;color:#666;font-style:italic;line-height:1.6;margin-bottom:6px}\n"
     ".rpt-pct{display:inline-block;font-size:11px;font-weight:600;color:#fff;"
     "border-radius:12px;padding:1px 8px;margin-left:8px;vertical-align:middle;opacity:0.85}\n"
     ".rpt-pct-ww{background:#16a34a}.rpt-pct-nw{background:#dc2626}.rpt-pct-mx{background:#d97706}\n"
@@ -854,6 +867,7 @@ def _rpt_insight(n: int, name: str, data: dict, n_iv: int = 0) -> str:
     """Render one numbered insight block in the document-style report tab."""
     tagline  = H(data.get("tagline", ""))
     summary  = H(data.get("summary", ""))
+    tension  = data.get("tension") or ""
     quotes   = data.get("quotes", [])
     category = data.get("category", "mixed")
     voice    = data.get("voice_count", 0)
@@ -870,12 +884,18 @@ def _rpt_insight(n: int, name: str, data: dict, n_iv: int = 0) -> str:
         if n_iv and voice else ""
     )
 
+    tension_block = (
+        f'<p class="rpt-tension-label">Tension</p>'
+        f'<p class="rpt-tension">{H(tension)}</p>'
+    ) if tension else ""
+
     ql = "".join(f'<p class="rpt-quote">&ldquo;{H(q)}&rdquo;</p>' for q in quotes)
     ql_block = f'<p class="rpt-qlabel">What people said:</p>{ql}' if quotes else ""
     return (
         f'<div class="{accent_cls}">'
         f'<h3 class="rpt-num">{n}. {H(name)}{pct_badge}</h3>'
         f'<p class="rpt-tagline">{tagline}</p>'
+        f'{tension_block}'
         f'<p class="rpt-body">{summary}</p>'
         f'{ql_block}'
         f'</div>'
@@ -940,12 +960,12 @@ def _bubble_pane(clusters: dict, lineage: dict, global_store: dict,
         t = math.sqrt((cnt - min_cnt) / (max_cnt - min_cnt))
         return R_MIN + t * (R_MAX - R_MIN)
 
-    SVG_W, SVG_H = 900, 480
+    SVG_W, SVG_H = 900, 560
     AXIS_Y = SVG_H - 38
     x_bands_px = {
-        "needs_work":   (int(SVG_W * 0.03), int(SVG_W * 0.32)),
+        "needs_work":   (int(SVG_W * 0.09), int(SVG_W * 0.32)),
         "mixed":        (int(SVG_W * 0.36), int(SVG_W * 0.64)),
-        "working_well": (int(SVG_W * 0.67), int(SVG_W * 0.96)),
+        "working_well": (int(SVG_W * 0.67), int(SVG_W * 0.91)),
     }
     colors = {
         "working_well": ("#16a34a", "rgba(22,163,74,0.13)"),
@@ -953,6 +973,7 @@ def _bubble_pane(clusters: dict, lineage: dict, global_store: dict,
         "mixed":        ("#d97706", "rgba(217,119,6,0.13)"),
     }
 
+    DROP_R = 24   # bubbles below this radius have no useful label -- drop them
     rng = random.Random(42)
     bubbles = []
     for l3c, cnt in sorted(filtered, key=lambda x: -x[1]):
@@ -960,6 +981,8 @@ def _bubble_pane(clusters: dict, lineage: dict, global_store: dict,
         cat      = clusters.get(cname, {}).get("category", "mixed")
         xlo, xhi = x_bands_px.get(cat, (int(SVG_W * 0.36), int(SVG_W * 0.64)))
         r        = _r(cnt)
+        if r < DROP_R:
+            continue
         cx_init  = rng.uniform(xlo + r, xhi - r)
         cy_frac  = 1 - (cnt - min_cnt) / max((max_cnt - min_cnt), 1)
         cy_init  = R_MAX + 20 + cy_frac * (AXIS_Y - R_MAX - 60 - r)
@@ -972,80 +995,59 @@ def _bubble_pane(clusters: dict, lineage: dict, global_store: dict,
             "stroke": stroke, "fill": fill,
         })
 
-    def _wrap(label: str, r: float) -> list:
-        max_chars = max(6, int(r * 2.0 / 7.5))
+    def _wrap(label: str) -> list:
+        """Split into at most 2 balanced lines. Never truncates."""
         words = label.split()
-        if not words:
+        if len(words) <= 1:
             return [label]
-        if len(label) <= max_chars * 1.3 or len(words) == 1:
-            return [label] if len(label) <= max_chars * 1.5 else [label[:max_chars - 1] + "..."]
         best, best_diff = 0, 9999
         for k in range(1, len(words)):
             l1 = " ".join(words[:k])
             l2 = " ".join(words[k:])
             diff = abs(len(l1) - len(l2))
-            if max(len(l1), len(l2)) <= max_chars * 1.3 and diff < best_diff:
+            if diff < best_diff:
                 best, best_diff = k, diff
-        if best:
-            return [" ".join(words[:best]), " ".join(words[best:])]
-        return [label[:max_chars - 1] + "..."]
+        return [" ".join(words[:best]), " ".join(words[best:])]
 
     circle_els = ""
-    for i, b in enumerate(bubbles):
-        clip_id = f"bcp{i}"
-        r = b["r"]
-        inside = r >= 30
-        fs     = max(9, min(14, int(r * 0.32)))
-        fs_pct = max(8, fs - 2)
+    for b in bubbles:
+        r      = b["r"]
+        # Font size proportional to radius; larger bubbles get bigger text.
+        # Text is always rendered inside the bubble and may overflow slightly for long labels.
+        fs     = max(8, min(14, int(r * 0.28)))
+        fs_pct = max(7, fs - 2)
+        lines  = _wrap(b["code"])
 
-        clip_def = (
-            f'<clipPath id="{clip_id}">'
-            f'<circle cx="{b["cx"]:.1f}" cy="{b["cy"]:.1f}" r="{r - 4:.1f}"/>'
-            f'</clipPath>'
-        )
         circle_el = (
             f'<circle class="bbl-c" cx="{b["cx"]:.1f}" cy="{b["cy"]:.1f}" r="{r:.1f}" '
             f'fill="{b["fill"]}" stroke="{b["stroke"]}" stroke-width="1.5"/>'
         )
 
-        if inside:
-            lines   = _wrap(b["code"], r)
-            n_lines = len(lines)
-            line_h  = fs * 1.25
-            block_h = n_lines * line_h + fs_pct * 1.4
-            y0      = b["cy"] - block_h / 2 + fs * 0.85
-            text_el = f'<g clip-path="url(#{clip_id})">'
-            for j, ln in enumerate(lines):
-                text_el += (
-                    f'<text x="{b["cx"]:.1f}" y="{y0 + j * line_h:.1f}" '
-                    f'text-anchor="middle" font-size="{fs}" font-family="Arial,sans-serif" '
-                    f'fill="{b["stroke"]}" font-weight="600">{H(ln)}</text>'
-                )
-            pct_y = y0 + n_lines * line_h + 2
+        n_lines = len(lines)
+        line_h  = fs * 1.3
+        block_h = n_lines * line_h + fs_pct * 1.5
+        y0      = b["cy"] - block_h / 2 + fs * 0.85
+        text_el = ""
+        for j, ln in enumerate(lines):
             text_el += (
-                f'<text x="{b["cx"]:.1f}" y="{pct_y:.1f}" '
-                f'text-anchor="middle" font-size="{fs_pct}" font-family="Arial,sans-serif" '
-                f'fill="{b["stroke"]}" opacity="0.65">~{b["pct"]}%</text>'
-                f'</g>'
+                f'<text x="{b["cx"]:.1f}" y="{y0 + j * line_h:.1f}" '
+                f'text-anchor="middle" font-size="{fs}" font-family="Arial,sans-serif" '
+                f'fill="{b["stroke"]}" font-weight="600" '
+                f'stroke="white" stroke-width="3" paint-order="stroke fill">{H(ln)}</text>'
             )
-        else:
-            label_y1 = b["cy"] + r + 13
-            label_y2 = b["cy"] + r + 24
-            text_el  = (
-                f'<text x="{b["cx"]:.1f}" y="{label_y1:.1f}" '
-                f'text-anchor="middle" font-size="9" font-family="Arial,sans-serif" '
-                f'fill="#333" font-weight="500">{H(b["code"])}</text>'
-                f'<text x="{b["cx"]:.1f}" y="{label_y2:.1f}" '
-                f'text-anchor="middle" font-size="8" font-family="Arial,sans-serif" '
-                f'fill="#aaa">~{b["pct"]}%</text>'
-            )
+        pct_y = y0 + n_lines * line_h + 2
+        text_el += (
+            f'<text x="{b["cx"]:.1f}" y="{pct_y:.1f}" '
+            f'text-anchor="middle" font-size="{fs_pct}" font-family="Arial,sans-serif" '
+            f'fill="{b["stroke"]}" opacity="0.8" '
+            f'stroke="white" stroke-width="2" paint-order="stroke fill">~{b["pct"]}%</text>'
+        )
 
         circle_els += (
             f'<g class="bbl" '
             f'data-cx="{b["cx"]:.1f}" data-cy="{b["cy"]:.1f}" data-r="{r:.1f}" '
-            f'data-inside="{1 if inside else 0}" '
             f'data-xmin="{b["xlo"]}" data-xmax="{b["xhi"]}">'
-            f'{clip_def}{circle_el}{text_el}</g>'
+            f'{circle_el}{text_el}</g>'
         )
 
     axis = (
@@ -1069,7 +1071,7 @@ def _bubble_pane(clusters: dict, lineage: dict, global_store: dict,
     )
 
     js_data = "[" + ",".join(
-        f'[{b["cx"]:.1f},{b["cy"]:.1f},{b["r"]:.1f},{b["xlo"]},{b["xhi"]},{1 if b["r"] >= 30 else 0}]'
+        f'[{b["cx"]:.1f},{b["cy"]:.1f},{b["r"]:.1f},{b["xlo"]},{b["xhi"]}]'
         for b in bubbles
     ) + "]"
 
@@ -1083,34 +1085,26 @@ def _bubble_pane(clusters: dict, lineage: dict, global_store: dict,
         "for(var j=i+1;j<D.length;j++){"
         "var dx=D[j][0]-D[i][0],dy=D[j][1]-D[i][1];"
         "var dist=Math.sqrt(dx*dx+dy*dy)||0.01;"
-        "var mn=D[i][2]+D[j][2]+10;"
+        "var mn=D[i][2]+D[j][2]+18;"
         "if(dist<mn){"
         "var push=(mn-dist)/2,nx=dx/dist,ny=dy/dist;"
         "D[i][0]-=nx*push;D[i][1]-=ny*push;"
         "D[j][0]+=nx*push;D[j][1]+=ny*push;}"
         "}"
         "D[i][0]=Math.max(D[i][3]+D[i][2],Math.min(D[i][4]-D[i][2],D[i][0]));"
-        "D[i][1]=Math.max(D[i][2]+8,Math.min(AXIS_Y-D[i][2]-8,D[i][1]));"
+        "D[i][1]=Math.max(D[i][2]+8,Math.min(AXIS_Y-D[i][2]-14,D[i][1]));"
         "}"
         "}"
         "gs.forEach(function(g,i){"
-        "var cx=D[i][0].toFixed(1),cy=D[i][1].toFixed(1),r=D[i][2],inside=D[i][5];"
+        "var cx=D[i][0].toFixed(1),cy=D[i][1].toFixed(1),r=D[i][2];"
         "var circ=g.querySelector('.bbl-c');"
         "if(circ){circ.setAttribute('cx',cx);circ.setAttribute('cy',cy);}"
-        "var cp=g.querySelector('clipPath circle');"
-        "if(cp){cp.setAttribute('cx',cx);cp.setAttribute('cy',cy);}"
         "var origCy=parseFloat(g.dataset.cy);"
         "var shift=parseFloat(cy)-origCy;"
-        "if(inside){"
         "g.querySelectorAll('text').forEach(function(t){"
         "t.setAttribute('x',cx);"
         "t.setAttribute('y',(parseFloat(t.getAttribute('y'))+shift).toFixed(1));"
-        "});}"
-        "else{"
-        "var ts=g.querySelectorAll('text');"
-        "if(ts[0]){ts[0].setAttribute('x',cx);ts[0].setAttribute('y',(parseFloat(cy)+r+13).toFixed(1));}"
-        "if(ts[1]){ts[1].setAttribute('x',cx);ts[1].setAttribute('y',(parseFloat(cy)+r+24).toFixed(1));}"
-        "}"
+        "});"
         "});"
         "})();"
     )
@@ -1167,7 +1161,7 @@ def _radar_pane(dimension_store: dict, n_iv: int) -> str:
             f'font-size="9" fill="#aaa" font-family="Arial,sans-serif">{pct}%</text>\n'
         )
 
-    # Axis lines + invisible hit areas + labels
+    # Axis lines + labels (visible only -- hit elements rendered after polygon)
     for i, dim in enumerate(EMOTIONAL_DIMENSIONS):
         angle = math.radians(-90 + i * 60)
         ax = CX + R * math.cos(angle)
@@ -1175,10 +1169,6 @@ def _radar_pane(dimension_store: dict, n_iv: int) -> str:
         out += (
             f'<line x1="{CX}" y1="{CY}" x2="{ax:.1f}" y2="{ay:.1f}" '
             f'stroke="#d8d8d8" stroke-width="1"/>\n'
-            # Invisible wider line for hover hit area
-            f'<line x1="{CX}" y1="{CY}" x2="{ax:.1f}" y2="{ay:.1f}" '
-            f'stroke="transparent" stroke-width="20" class="radar-hit" '
-            f'data-dim="{dim}" data-idx="{i}"/>\n'
         )
         lx = CX + LABEL_R * math.cos(angle)
         ly = CY + LABEL_R * math.sin(angle) + dy_extra[i]
@@ -1213,6 +1203,22 @@ def _radar_pane(dimension_store: dict, n_iv: int) -> str:
             f'<text x="{ann_x:.1f}" y="{ann_y + 4:.1f}" text-anchor="middle" '
             f'font-size="10" font-family="Arial,sans-serif" fill="#4f8ef7" font-weight="600">'
             f'~{pct_val}%</text>\n'
+        )
+
+    # Invisible hit elements -- rendered last so they sit on top of the polygon fill
+    # Users naturally hover near the polygon edge/vertex, not just the background axis lines
+    for i, (px, py) in enumerate(poly_pts):
+        angle = math.radians(-90 + i * 60)
+        ax    = CX + R * math.cos(angle)
+        ay    = CY + R * math.sin(angle)
+        dim   = EMOTIONAL_DIMENSIONS[i]
+        out += (
+            f'<line x1="{CX}" y1="{CY}" x2="{ax:.1f}" y2="{ay:.1f}" '
+            f'stroke="transparent" stroke-width="20" class="radar-hit" '
+            f'data-dim="{dim}" data-idx="{i}"/>\n'
+            f'<circle cx="{px:.1f}" cy="{py:.1f}" r="22" '
+            f'fill="transparent" stroke="none" class="radar-hit" '
+            f'data-dim="{dim}" data-idx="{i}"/>\n'
         )
 
     # SVG caption
