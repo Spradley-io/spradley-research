@@ -225,7 +225,7 @@ PROMPT_L2_DIRECT = (
     "You are a qualitative researcher performing thematic coding of a complete employee interview.\n\n"
     "Your task: read all Q&A turns below and generate between {l2_min} and {l2_max} open codes\n"
     "(2-5 word noun phrases) that together cover all meaningful topics raised in the interview.\n"
-    "Be exhaustive — do not drop a theme just because it appears in only one or two turns.\n\n"
+    "Be exhaustive -- do not drop a theme just because it appears in only one or two turns.\n\n"
     "For each code, list the IDs of the turns that support it (\"source_qa_ids\").\n"
     "A turn may be left uncited if it contains nothing codeable\n"
     "(e.g. a purely procedural exchange or a turn where the employee has nothing to add).\n\n"
@@ -247,11 +247,11 @@ PROMPT_L2_DIRECT = (
     '  {{"code": "accessible and honest management", "source_qa_ids": ["abc1_t1"]}},\n'
     '  {{"code": "uninterrupted deep work", "source_qa_ids": ["abc1_t2"]}}\n'
     "]}}\n"
-    "(abc1_t3 is uncited — the employee provided no codeable content)\n"
+    "(abc1_t3 is uncited -- the employee provided no codeable content)\n"
     "--- END EXAMPLE ---\n\n"
     "Complete interview ({n_turns} turns):\n"
     "{interview_turns}\n\n"
-    "Return only valid JSON — no other text:\n"
+    "Return only valid JSON -- no other text:\n"
     '{{"codes": [{{"code": "label", "source_qa_ids": ["turn_id"]}}, ...]}}'
 )
 
@@ -303,7 +303,7 @@ PROMPT_L3 = (
     "--- END EXAMPLE ---\n\n"
     "All L2 codes (one per line):\n"
     "{l2_codes_list}\n\n"
-    "Return only valid JSON — no other text:\n"
+    "Return only valid JSON -- no other text:\n"
     '{{"consolidated_codes": [\n'
     '  {{"code": "new label", "merged_from_l2": ["source l2 code"]}},\n'
     "  ...\n"
@@ -345,7 +345,7 @@ PROMPT_CLUSTER = (
     "--- END EXAMPLE ---\n\n"
     "Final codes (L3):\n"
     "{l3_codes_list}\n\n"
-    "Return only valid JSON — no other text:\n"
+    "Return only valid JSON -- no other text:\n"
     '{{"clusters": [\n'
     '  {{"name": "Cluster Name", "codes": ["l3 code 1", "l3 code 2"]}},\n'
     "  ...\n"
@@ -394,7 +394,7 @@ PROMPT_FINDING = (
     "summary (Pyramid Principle -- 3 sentences max):\n"
     "  - Sentence 1: restate the answer directly (the conclusion in one line).\n"
     "  - Sentence 2: cite 1-2 specific evidence patterns from the responses above.\n"
-    "  - Sentence 3: state the business implication or tension.\n"
+    "  - Sentence 3: state the business implication or the action priority.\n"
     "  - No filler openers ('The data shows...', 'It appears that...'). State claims directly.\n"
     "  - If evidence is mixed, sentence 2 must name both directions explicitly.\n"
     "  - Ground every claim in the cited responses. If only some employees mentioned something,\n"
@@ -403,7 +403,8 @@ PROMPT_FINDING = (
     "  - 2-3 paraphrases, as specific and concrete as possible. Prefer concrete over abstract.\n"
     "  - Strip filler words ('you know', 'like', 'I mean'). Preserve meaning and anonymity.\n"
     "tag: 1-2 word theme label e.g. Culture, Development, Wellbeing.\n"
-    "Never use em dashes in any text.\n"
+    "Never use em dashes, dramatic openers ('The tension is acute:', 'This reveals a divide:',\n"
+    "'The stakes are high:'), or AI-sounding framing. Write plainly.\n"
     "Return only valid JSON. No other text."
 )
 
@@ -514,6 +515,7 @@ PROMPT_HEADLINE = (
     "  - Question + Answer (paragraph 3): state the implicit management question, then give your synthesis "
     "and main recommendation. Put the answer first -- do not build to it.\n"
     "Keep paragraphs tight (2-3 sentences each). No superlatives. No filler. "
+    "No dramatic openers or AI-sounding phrasing ('The tension is clear:', 'This signals a crisis:'). "
     "Do not list findings -- tell a story. Ground every claim in the evidence below.\n\n"
     "Number of employees interviewed: {n_interviews}\n\n"
     "Findings:\n"
@@ -688,7 +690,14 @@ APP_CSS = (
     ".topics-section h3{font-size:15px;font-weight:700;margin-bottom:8px;color:#111}\n"
     ".topics-intro{font-size:13px;color:#666;margin-bottom:16px;line-height:1.6;max-width:640px}\n"
     ".topics-svg{width:100%;height:auto;display:block}\n"
-    ".radar-wrap{max-width:560px;margin:0 auto}\n"
+    ".radar-wrap{max-width:560px;margin:0 auto;position:relative}\n"
+    "#radar-tooltip{position:absolute;background:#fff;border:1px solid #e5e7eb;border-radius:6px;"
+    "padding:10px 14px;font-size:12px;line-height:1.6;color:#333;"
+    "box-shadow:0 2px 8px rgba(0,0,0,0.10);pointer-events:none;display:none;"
+    "max-width:220px;z-index:10}\n"
+    "#radar-tooltip strong{display:block;font-size:13px;margin-bottom:4px;color:#111}\n"
+    "#radar-tooltip .rt-pct{font-size:15px;font-weight:700;color:#4f8ef7;margin-bottom:6px;display:block}\n"
+    "#radar-tooltip .rt-def{color:#666;font-size:11px;line-height:1.5}\n"
 )
 
 
@@ -894,22 +903,19 @@ def _rpt_exp(n: int, exp: dict) -> str:
 
 def _bubble_pane(clusters: dict, lineage: dict, global_store: dict,
                   interview_store: dict, n_iv: int) -> str:
-    """SVG bubble chart: one circle per L3 code with > 10% interview coverage."""
+    """SVG bubble chart: free-scatter with force-directed collision avoidance."""
     import math, random
 
-    # l3 -> cluster name
-    l3_to_cluster = {}
+    l3_to_cluster: dict = {}
     for cname, cdata in clusters.items():
         for l3c in cdata.get("l3_codes", []):
             l3_to_cluster[l3c] = cname
 
-    # l2 -> set of interview ids
     l2_to_ivs: dict = {}
     for iid, store in interview_store.items():
         for item in store.get("l2_codes", []):
             l2_to_ivs.setdefault(item["code"], set()).add(iid)
 
-    # l3 -> interview count
     l3_to_count: dict = {}
     for l3item in global_store.get("l3_codes", []):
         l3c = l3item["code"]
@@ -923,10 +929,10 @@ def _bubble_pane(clusters: dict, lineage: dict, global_store: dict,
     if not filtered:
         return '<p class="topics-intro">No topics met the 10% coverage threshold.</p>'
 
-    counts   = [cnt for _, cnt in filtered]
-    min_cnt  = min(counts)
-    max_cnt  = max(counts)
-    R_MIN, R_MAX = 18, 50
+    counts  = [cnt for _, cnt in filtered]
+    min_cnt = min(counts)
+    max_cnt = max(counts)
+    R_MIN, R_MAX = 20, 68
 
     def _r(cnt: int) -> float:
         if max_cnt == min_cnt:
@@ -934,74 +940,178 @@ def _bubble_pane(clusters: dict, lineage: dict, global_store: dict,
         t = math.sqrt((cnt - min_cnt) / (max_cnt - min_cnt))
         return R_MIN + t * (R_MAX - R_MIN)
 
-    x_bands = {"needs_work": (0.03, 0.28), "mixed": (0.36, 0.62), "working_well": (0.66, 0.93)}
-    colors  = {
-        "working_well": ("#16a34a", "rgba(22,163,74,0.15)"),
-        "needs_work":   ("#dc2626", "rgba(220,38,38,0.15)"),
-        "mixed":        ("#d97706", "rgba(217,119,6,0.15)"),
+    SVG_W, SVG_H = 900, 480
+    AXIS_Y = SVG_H - 38
+    x_bands_px = {
+        "needs_work":   (int(SVG_W * 0.03), int(SVG_W * 0.32)),
+        "mixed":        (int(SVG_W * 0.36), int(SVG_W * 0.64)),
+        "working_well": (int(SVG_W * 0.67), int(SVG_W * 0.96)),
     }
-    SVG_W, SVG_H = 900, 340
+    colors = {
+        "working_well": ("#16a34a", "rgba(22,163,74,0.13)"),
+        "needs_work":   ("#dc2626", "rgba(220,38,38,0.13)"),
+        "mixed":        ("#d97706", "rgba(217,119,6,0.13)"),
+    }
 
     rng = random.Random(42)
     bubbles = []
     for l3c, cnt in sorted(filtered, key=lambda x: -x[1]):
-        cname = l3_to_cluster.get(l3c, "")
-        cat   = clusters.get(cname, {}).get("category", "mixed")
-        lo, hi = x_bands.get(cat, (0.36, 0.62))
-        cx    = rng.uniform(lo, hi) * SVG_W
-        r     = _r(cnt)
-        pct   = round(cnt / n_iv * 10) * 10
-        stroke, fill = colors.get(cat, ("#888", "rgba(136,136,136,0.15)"))
-        max_chars = max(4, int(r * 2 / 7))
-        label = l3c if len(l3c) <= max_chars else l3c[:max_chars - 1] + "..."
-        bubbles.append({"cx": cx, "r": r, "pct": pct, "label": label,
-                         "stroke": stroke, "fill": fill})
+        cname    = l3_to_cluster.get(l3c, "")
+        cat      = clusters.get(cname, {}).get("category", "mixed")
+        xlo, xhi = x_bands_px.get(cat, (int(SVG_W * 0.36), int(SVG_W * 0.64)))
+        r        = _r(cnt)
+        cx_init  = rng.uniform(xlo + r, xhi - r)
+        cy_frac  = 1 - (cnt - min_cnt) / max((max_cnt - min_cnt), 1)
+        cy_init  = R_MAX + 20 + cy_frac * (AXIS_Y - R_MAX - 60 - r)
+        pct      = round(cnt / n_iv * 10) * 10
+        stroke, fill = colors.get(cat, ("#888", "rgba(136,136,136,0.13)"))
+        bubbles.append({
+            "code": l3c, "r": r, "pct": pct,
+            "cx": cx_init, "cy": cy_init,
+            "xlo": xlo, "xhi": xhi,
+            "stroke": stroke, "fill": fill,
+        })
+
+    def _wrap(label: str, r: float) -> list:
+        max_chars = max(6, int(r * 2.0 / 7.5))
+        words = label.split()
+        if not words:
+            return [label]
+        if len(label) <= max_chars * 1.3 or len(words) == 1:
+            return [label] if len(label) <= max_chars * 1.5 else [label[:max_chars - 1] + "..."]
+        best, best_diff = 0, 9999
+        for k in range(1, len(words)):
+            l1 = " ".join(words[:k])
+            l2 = " ".join(words[k:])
+            diff = abs(len(l1) - len(l2))
+            if max(len(l1), len(l2)) <= max_chars * 1.3 and diff < best_diff:
+                best, best_diff = k, diff
+        if best:
+            return [" ".join(words[:best]), " ".join(words[best:])]
+        return [label[:max_chars - 1] + "..."]
 
     circle_els = ""
-    for b in bubbles:
-        fs     = max(7, min(13, int(b["r"] * 0.38)))
-        fs_pct = max(6, int(fs * 0.8))
-        cx_s   = f"{b['cx']:.1f}"
-        r_s    = f"{b['r']:.1f}"
-        circle_els += (
-            f'<g data-cx="{cx_s}" data-r="{r_s}" class="bbl">'
-            f'<circle cx="{cx_s}" cy="160" r="{r_s}" '
+    for i, b in enumerate(bubbles):
+        clip_id = f"bcp{i}"
+        r = b["r"]
+        inside = r >= 30
+        fs     = max(9, min(14, int(r * 0.32)))
+        fs_pct = max(8, fs - 2)
+
+        clip_def = (
+            f'<clipPath id="{clip_id}">'
+            f'<circle cx="{b["cx"]:.1f}" cy="{b["cy"]:.1f}" r="{r - 4:.1f}"/>'
+            f'</clipPath>'
+        )
+        circle_el = (
+            f'<circle class="bbl-c" cx="{b["cx"]:.1f}" cy="{b["cy"]:.1f}" r="{r:.1f}" '
             f'fill="{b["fill"]}" stroke="{b["stroke"]}" stroke-width="1.5"/>'
-            f'<text x="{cx_s}" y="160" text-anchor="middle" dominant-baseline="middle" '
-            f'font-size="{fs}" font-family="sans-serif" fill="{b["stroke"]}">'
-            f'{H(b["label"])}'
-            f'<tspan x="{cx_s}" dy="{fs * 1.1:.1f}" font-size="{fs_pct}" fill="#aaa">'
-            f'~{b["pct"]}%</tspan>'
-            f'</text></g>'
+        )
+
+        if inside:
+            lines   = _wrap(b["code"], r)
+            n_lines = len(lines)
+            line_h  = fs * 1.25
+            block_h = n_lines * line_h + fs_pct * 1.4
+            y0      = b["cy"] - block_h / 2 + fs * 0.85
+            text_el = f'<g clip-path="url(#{clip_id})">'
+            for j, ln in enumerate(lines):
+                text_el += (
+                    f'<text x="{b["cx"]:.1f}" y="{y0 + j * line_h:.1f}" '
+                    f'text-anchor="middle" font-size="{fs}" font-family="Arial,sans-serif" '
+                    f'fill="{b["stroke"]}" font-weight="600">{H(ln)}</text>'
+                )
+            pct_y = y0 + n_lines * line_h + 2
+            text_el += (
+                f'<text x="{b["cx"]:.1f}" y="{pct_y:.1f}" '
+                f'text-anchor="middle" font-size="{fs_pct}" font-family="Arial,sans-serif" '
+                f'fill="{b["stroke"]}" opacity="0.65">~{b["pct"]}%</text>'
+                f'</g>'
+            )
+        else:
+            label_y1 = b["cy"] + r + 13
+            label_y2 = b["cy"] + r + 24
+            text_el  = (
+                f'<text x="{b["cx"]:.1f}" y="{label_y1:.1f}" '
+                f'text-anchor="middle" font-size="9" font-family="Arial,sans-serif" '
+                f'fill="#333" font-weight="500">{H(b["code"])}</text>'
+                f'<text x="{b["cx"]:.1f}" y="{label_y2:.1f}" '
+                f'text-anchor="middle" font-size="8" font-family="Arial,sans-serif" '
+                f'fill="#aaa">~{b["pct"]}%</text>'
+            )
+
+        circle_els += (
+            f'<g class="bbl" '
+            f'data-cx="{b["cx"]:.1f}" data-cy="{b["cy"]:.1f}" data-r="{r:.1f}" '
+            f'data-inside="{1 if inside else 0}" '
+            f'data-xmin="{b["xlo"]}" data-xmax="{b["xhi"]}">'
+            f'{clip_def}{circle_el}{text_el}</g>'
         )
 
     axis = (
-        f'<line x1="0" y1="305" x2="{SVG_W}" y2="305" stroke="#e5e5e5" stroke-width="1"/>'
-        '<text x="28" y="320" font-size="10" font-family="sans-serif" fill="#dc2626">Needs Work</text>'
-        '<text x="450" y="320" font-size="10" font-family="sans-serif" fill="#d97706" '
-        'text-anchor="middle">Mixed Signals</text>'
-        f'<text x="{SVG_W - 28}" y="320" font-size="10" font-family="sans-serif" '
-        'fill="#16a34a" text-anchor="end">Working Well</text>'
+        f'<defs>'
+        f'<marker id="arrowR" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">'
+        f'<polygon points="0 0, 8 3, 0 6" fill="#bbb"/></marker>'
+        f'<marker id="arrowL" markerWidth="8" markerHeight="6" refX="0" refY="3" orient="auto">'
+        f'<polygon points="8 0, 0 3, 8 6" fill="#bbb"/></marker>'
+        f'</defs>'
+        f'<line x1="24" y1="{AXIS_Y}" x2="{SVG_W - 24}" y2="{AXIS_Y}" '
+        f'stroke="#bbb" stroke-width="1" marker-end="url(#arrowR)" marker-start="url(#arrowL)"/>'
+        f'<text x="28" y="{AXIS_Y + 14}" font-size="10" font-family="Arial,sans-serif" '
+        f'fill="#dc2626" font-weight="500">Needs Work</text>'
+        f'<text x="{SVG_W // 2}" y="{AXIS_Y + 14}" font-size="10" font-family="Arial,sans-serif" '
+        f'fill="#d97706" text-anchor="middle">Mixed Signals</text>'
+        f'<text x="{SVG_W - 28}" y="{AXIS_Y + 14}" font-size="10" font-family="Arial,sans-serif" '
+        f'fill="#16a34a" text-anchor="end" font-weight="500">Working Well</text>'
+        f'<text x="{SVG_W // 2}" y="{SVG_H - 4}" font-size="9" font-family="Arial,sans-serif" '
+        f'fill="#ccc" text-anchor="middle">'
+        f'Bubble size and percentage reflect share of participants who raised this topic.</text>'
     )
+
+    js_data = "[" + ",".join(
+        f'[{b["cx"]:.1f},{b["cy"]:.1f},{b["r"]:.1f},{b["xlo"]},{b["xhi"]},{1 if b["r"] >= 30 else 0}]'
+        for b in bubbles
+    ) + "]"
 
     js = (
         "(function(){"
-        "var gs=document.querySelectorAll('.bbl'),placed=[];"
-        "gs.forEach(function(g){"
-        "var cx=parseFloat(g.dataset.cx),r=parseFloat(g.dataset.r),cy=155;"
-        "for(var att=0;att<18;att++){"
-        "var ok=true;"
-        "for(var i=0;i<placed.length;i++){"
-        "var dx=cx-placed[i][0],dy=cy-placed[i][1];"
-        "if(Math.sqrt(dx*dx+dy*dy)<r+placed[i][2]+5){ok=false;break;}"
+        + f"var AXIS_Y={AXIS_Y};"
+        + f"var D={js_data};"
+        + "var gs=document.querySelectorAll('.bbl');"
+        "for(var iter=0;iter<80;iter++){"
+        "for(var i=0;i<D.length;i++){"
+        "for(var j=i+1;j<D.length;j++){"
+        "var dx=D[j][0]-D[i][0],dy=D[j][1]-D[i][1];"
+        "var dist=Math.sqrt(dx*dx+dy*dy)||0.01;"
+        "var mn=D[i][2]+D[j][2]+10;"
+        "if(dist<mn){"
+        "var push=(mn-dist)/2,nx=dx/dist,ny=dy/dist;"
+        "D[i][0]-=nx*push;D[i][1]-=ny*push;"
+        "D[j][0]+=nx*push;D[j][1]+=ny*push;}"
         "}"
-        "if(ok)break;"
-        "cy+=(att%2===0?1:-1)*Math.ceil((att+1)/2)*(r*0.85);"
-        "cy=Math.max(r+10,Math.min(295-r,cy));}"
-        "placed.push([cx,cy,r]);"
-        "var c=g.querySelector('circle');c.setAttribute('cy',cy);"
-        "var t=g.querySelector('text');t.setAttribute('y',cy);"
-        "var ts=g.querySelector('tspan');if(ts)ts.setAttribute('x',cx);});"
+        "D[i][0]=Math.max(D[i][3]+D[i][2],Math.min(D[i][4]-D[i][2],D[i][0]));"
+        "D[i][1]=Math.max(D[i][2]+8,Math.min(AXIS_Y-D[i][2]-8,D[i][1]));"
+        "}"
+        "}"
+        "gs.forEach(function(g,i){"
+        "var cx=D[i][0].toFixed(1),cy=D[i][1].toFixed(1),r=D[i][2],inside=D[i][5];"
+        "var circ=g.querySelector('.bbl-c');"
+        "if(circ){circ.setAttribute('cx',cx);circ.setAttribute('cy',cy);}"
+        "var cp=g.querySelector('clipPath circle');"
+        "if(cp){cp.setAttribute('cx',cx);cp.setAttribute('cy',cy);}"
+        "var origCy=parseFloat(g.dataset.cy);"
+        "var shift=parseFloat(cy)-origCy;"
+        "if(inside){"
+        "g.querySelectorAll('text').forEach(function(t){"
+        "t.setAttribute('x',cx);"
+        "t.setAttribute('y',(parseFloat(t.getAttribute('y'))+shift).toFixed(1));"
+        "});}"
+        "else{"
+        "var ts=g.querySelectorAll('text');"
+        "if(ts[0]){ts[0].setAttribute('x',cx);ts[0].setAttribute('y',(parseFloat(cy)+r+13).toFixed(1));}"
+        "if(ts[1]){ts[1].setAttribute('x',cx);ts[1].setAttribute('y',(parseFloat(cy)+r+24).toFixed(1));}"
+        "}"
+        "});"
         "})();"
     )
 
@@ -1013,8 +1123,8 @@ def _bubble_pane(clusters: dict, lineage: dict, global_store: dict,
 
 
 def _radar_pane(dimension_store: dict, n_iv: int) -> str:
-    """SVG radar chart for 6 emotional dimensions. Returns empty-state message if data missing."""
-    import math
+    """SVG radar chart for 6 emotional dimensions with hover tooltips."""
+    import math, json as _json
 
     total = dimension_store.get("_total", {})
     if not total or not n_iv:
@@ -1023,42 +1133,58 @@ def _radar_pane(dimension_store: dict, n_iv: int) -> str:
             'Emotional dimension data not yet available. Run C9c in Pipeline_Execution.ipynb first.</p>'
         )
 
-    CX, CY, R = 300, 250, 175
-    LABEL_R   = R + 28
-    RINGS     = [20, 40, 60, 80, 100]
+    CX, CY, R = 300, 255, 175
+    LABEL_R    = R + 30
+    RINGS      = [20, 40, 60, 80, 100]
     DIM_LABELS = ["Satisfaction", "Stress", "Worry", "Trust", "Motivation", "Fairness"]
-    anchors   = ["middle", "start", "start", "middle", "end", "end"]
-    dy_extra  = [-6, 4, 4, 16, 4, 4]
+    DIM_DEFS   = {
+        "satisfaction": "Personal fulfilment, enjoyment, or positive engagement with work or team.",
+        "stress":       "Personal pressure, overload, anxiety, or overwhelm.",
+        "worry":        "Uncertainty about the future, job security, or direction.",
+        "trust":        "Direct expression of trust or distrust in management, colleagues, or processes.",
+        "motivation":   "Sense of purpose, drive, desire for recognition or growth.",
+        "fairness":     "Perceived equal treatment, transparent criteria, or consistent standards.",
+    }
+    anchors  = ["middle", "start", "start", "middle", "end", "end"]
+    dy_extra = [-8, 4, 4, 18, 4, 4]
 
     scores = [total.get(d, 0) / n_iv for d in EMOTIONAL_DIMENSIONS]
 
-    out = '<svg viewBox="0 0 600 500" class="topics-svg">\n'
+    out = '<svg viewBox="0 0 600 510" class="topics-svg" id="radar-svg">\n'
 
     # Concentric rings
+    label_angle = math.radians(-90 + 50)   # fixed position between top and right axes
     for pct in RINGS:
         ring_r = pct / 100 * R
+        lx = CX + ring_r * math.cos(label_angle) + 3
+        ly = CY + ring_r * math.sin(label_angle) + 3
         out += (
             f'<circle cx="{CX}" cy="{CY}" r="{ring_r:.1f}" '
-            f'fill="none" stroke="#e5e5e5" stroke-width="1"/>\n'
-            f'<text x="{CX + ring_r + 3:.1f}" y="{CY + 4}" '
-            f'font-size="9" fill="#ccc" font-family="sans-serif">{pct}%</text>\n'
+            f'fill="none" stroke="#e8e8e8" stroke-width="1"/>\n'
+            f'<rect x="{lx - 3:.1f}" y="{ly - 9:.1f}" width="26" height="12" '
+            f'fill="white" rx="2"/>\n'
+            f'<text x="{lx:.1f}" y="{ly:.1f}" '
+            f'font-size="9" fill="#aaa" font-family="Arial,sans-serif">{pct}%</text>\n'
         )
 
-    # Axes and labels
+    # Axis lines + invisible hit areas + labels
     for i, dim in enumerate(EMOTIONAL_DIMENSIONS):
         angle = math.radians(-90 + i * 60)
         ax = CX + R * math.cos(angle)
         ay = CY + R * math.sin(angle)
         out += (
             f'<line x1="{CX}" y1="{CY}" x2="{ax:.1f}" y2="{ay:.1f}" '
-            f'stroke="#d5d5d5" stroke-width="1"/>\n'
+            f'stroke="#d8d8d8" stroke-width="1"/>\n'
+            # Invisible wider line for hover hit area
+            f'<line x1="{CX}" y1="{CY}" x2="{ax:.1f}" y2="{ay:.1f}" '
+            f'stroke="transparent" stroke-width="20" class="radar-hit" '
+            f'data-dim="{dim}" data-idx="{i}"/>\n'
         )
         lx = CX + LABEL_R * math.cos(angle)
         ly = CY + LABEL_R * math.sin(angle) + dy_extra[i]
-        label_color = "#16a34a" if scores[i] >= 0.5 else "#555"
         out += (
             f'<text x="{lx:.1f}" y="{ly:.1f}" text-anchor="{anchors[i]}" '
-            f'font-size="11" font-family="sans-serif" fill="{label_color}" font-weight="500">'
+            f'font-size="11" font-family="Arial,sans-serif" fill="#333" font-weight="500">'
             f'{DIM_LABELS[i]}</text>\n'
         )
 
@@ -1075,12 +1201,69 @@ def _radar_pane(dimension_store: dict, n_iv: int) -> str:
         f'stroke="#4f8ef7" stroke-width="2"/>\n'
     )
 
-    # Vertex dots
-    for px, py in poly_pts:
+    # Vertex dots + percentage annotations
+    for i, (px, py) in enumerate(poly_pts):
         out += f'<circle cx="{px:.1f}" cy="{py:.1f}" r="4" fill="#4f8ef7"/>\n'
+        angle   = math.radians(-90 + i * 60)
+        ann_off = 14
+        ann_x   = CX + (scores[i] * R + ann_off) * math.cos(angle)
+        ann_y   = CY + (scores[i] * R + ann_off) * math.sin(angle)
+        pct_val = round(scores[i] * 10) * 10
+        out += (
+            f'<text x="{ann_x:.1f}" y="{ann_y + 4:.1f}" text-anchor="middle" '
+            f'font-size="10" font-family="Arial,sans-serif" fill="#4f8ef7" font-weight="600">'
+            f'~{pct_val}%</text>\n'
+        )
+
+    # SVG caption
+    out += (
+        f'<text x="{CX}" y="498" text-anchor="middle" font-size="9" '
+        f'font-family="Arial,sans-serif" fill="#ccc">'
+        f'Blue area shows share of participants who directly expressed each dimension.</text>\n'
+    )
 
     out += '</svg>\n'
-    return out
+
+    # Build dimension data for JS tooltip
+    dim_data = {}
+    for i, dim in enumerate(EMOTIONAL_DIMENSIONS):
+        pct_val = round(scores[i] * 10) * 10
+        dim_data[dim] = {
+            "label": DIM_LABELS[i],
+            "pct":   pct_val,
+            "def":   DIM_DEFS[dim],
+        }
+
+    js = (
+        "(function(){"
+        "var wrap=document.querySelector('.radar-wrap');"
+        "if(!wrap)return;"
+        "var tip=document.createElement('div');"
+        "tip.id='radar-tooltip';wrap.appendChild(tip);"
+        f"var DIM={_json.dumps(dim_data)};"
+        "document.querySelectorAll('.radar-hit').forEach(function(el){"
+        "el.addEventListener('mouseenter',function(e){"
+        "var d=DIM[el.dataset.dim];if(!d)return;"
+        "tip.innerHTML='<strong>'+d.label+'</strong>"
+        "<span class=\"rt-pct\">~'+d.pct+'% of participants</span>"
+        "<span class=\"rt-def\">'+d.def+'</span>';"
+        "tip.style.display='block';"
+        "var rect=wrap.getBoundingClientRect();"
+        "tip.style.left=(e.clientX-rect.left+12)+'px';"
+        "tip.style.top=(e.clientY-rect.top-10)+'px';"
+        "});"
+        "el.addEventListener('mousemove',function(e){"
+        "var rect=wrap.getBoundingClientRect();"
+        "tip.style.left=(e.clientX-rect.left+12)+'px';"
+        "tip.style.top=(e.clientY-rect.top-10)+'px';"
+        "});"
+        "el.addEventListener('mouseleave',function(){"
+        "tip.style.display='none';});"
+        "});"
+        "})();"
+    )
+
+    return out + f'<script>{js}</script>\n'
 
 
 def build_report_html(
