@@ -28,8 +28,11 @@ CONFIG = {
     # ── Input ─────────────────────────────────────────────────────────────────
     # Set INPUT_FILE to the filename inside interview_input/.
     # Set INPUT_FORMAT to the matching parser key (see _PARSERS below).
-    "INPUT_FILE":      "the-office-2.csv",
-    "INPUT_FORMAT":    "spradley_v2",
+    "INPUT_FILE":        "the-office-2.csv",
+    "INPUT_FORMAT":      "spradley_v2",
+    # ── Experiments ───────────────────────────────────────────────────────────
+    # Total experiment proposals across all needs_work / mixed clusters.
+    "MAX_EXPERIMENTS":   3,
 }
 
 
@@ -397,11 +400,12 @@ PROMPT_EXPERIMENTS = (
     "consultant selling a solution. Be specific and concrete -- vague suggestions are not useful.\n\n"
     "Findings that need attention:\n"
     "{findings_text}\n\n"
-    "Propose 2-4 concrete, low-cost experiments the team could run to address these findings.\n"
-    "Each experiment should be actionable within 1-2 weeks with a clear success signal.\n\n"
+    "Choose the {max_n} most impactful experiments across all findings above. "
+    "Prioritise by likely impact and feasibility within 1-2 weeks.\n\n"
     "Return valid JSON:\n"
     '{{"experiments": [\n'
     '  {{"title": "Short experiment name",\n'
+    '   "source_cluster": "exact finding name from the list above",\n'
     '   "insight": "1-2 sentences: which finding this addresses and why it matters for that team.",\n'
     '   "try_this": "The concrete action: what to do, how often, who does it. One paragraph.",\n'
     '   "working_when": "One sentence: the observable change that signals this is working.",\n'
@@ -421,12 +425,15 @@ def explain_cluster(name: str, l3_codes: list, qa_pairs_text: str) -> dict:
     raw = call_llm(prompt)
     return parse_json_safe(raw)
 
-def propose_experiments(needs_attention: list) -> list:
+def propose_experiments(needs_attention: list, max_n: int | None = None) -> list:
     """Generate experiment proposals for needs_work and mixed clusters.
     needs_attention: [(name, data_dict), ...]
+    max_n: total experiments to return; defaults to CONFIG["MAX_EXPERIMENTS"].
     """
     if not needs_attention:
         return []
+    if max_n is None:
+        max_n = CONFIG.get("MAX_EXPERIMENTS", 3)
     parts = []
     for name, data in needs_attention:
         parts.append(
@@ -434,8 +441,11 @@ def propose_experiments(needs_attention: list) -> list:
             f"Category: {data['category']}\n"
             f"Summary: {data['summary']}"
         )
-    prompt = PROMPT_EXPERIMENTS.format(findings_text="\n\n---\n\n".join(parts))
-    raw    = call_llm(prompt)
+    prompt = PROMPT_EXPERIMENTS.format(
+        findings_text="\n\n---\n\n".join(parts),
+        max_n=max_n,
+    )
+    raw = call_llm(prompt)
     return parse_json_safe(raw).get("experiments", [])
 
 
