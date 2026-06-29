@@ -12,6 +12,6 @@
 
 ## Project
 - Company name is **Spradley** (not Spreadley).
-- Output directory is `pipeline_output/`. JSON data files are gitignored; `report.html` is committed.
+- Output directory is `pipeline_output/`. JSON data files are gitignored; `{dataset-id}_report.html` and `{dataset-id}_eval_report.html` are committed (e.g. `the-office-2_report.html`).
 - Logo file lives at `assets/spradley_logo.png`.
 - See `memory/project_spradley_pipeline.md` for cell map and data structure reference.

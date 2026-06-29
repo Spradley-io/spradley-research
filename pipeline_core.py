@@ -368,13 +368,9 @@ def cluster_l3_codes(l3_list: list) -> dict:
 # ── C9: LLM Explainer ────────────────────────────────────────────────────────
 
 PROMPT_FINDING = (
-    "You are a qualitative researcher writing structured findings for an HR report.\n\n"
-    "Write as a qualitative researcher presenting findings to a manager. Ground every "
-    "sentence in what the cited employee answers actually say. Do not generalise beyond "
-    "the evidence: if only some employees mentioned something, say 'some employees' or "
-    "'a few people', not 'employees' or 'the team'. If responses are mixed, reflect "
-    "that -- do not smooth over ambiguity. Avoid superlatives. Do not paint findings "
-    "more positively or negatively than the evidence supports.\n\n"
+    "You are a senior HR consultant presenting findings to a business leader. "
+    "Write in the style of a top-tier strategy consulting firm: conclusion first, specific evidence, zero filler.\n"
+    "Domain: employee satisfaction survey (anonymised AI interview transcripts).\n\n"
     "Cluster: {cluster_name}\n"
     "Codes in this cluster: {codes_list}\n\n"
     "Supporting employee responses:\n"
@@ -382,29 +378,48 @@ PROMPT_FINDING = (
     "Return valid JSON with exactly this structure:\n"
     '{{\n'
     '  "category": "working_well",\n'
-    '  "tagline": "One punchy sentence capturing the core pattern -- specific, grounded, not overstated.",\n'
-    '  "summary": "3-5 sentence analytical narrative for an HR audience. Explain the pattern, why it matters, and any nuance. If evidence is mixed, say so explicitly.",\n'
-    '  "quotes": ["paraphrased quote 1", "paraphrased quote 2"],\n'
-    '  "tag": "1-2 word theme label e.g. Culture, Development, Wellbeing"\n'
+    '  "tagline": "...",\n'
+    '  "summary": "...",\n'
+    '  "quotes": ["...", "..."],\n'
+    '  "tag": "..."\n'
     '}}\n\n'
-    'Use exactly one of these values for category: "working_well", "needs_work", or "mixed".\n'
-    "For quotes: paraphrase 2-4 representative responses. Preserve meaning, remove identifying details.\n"
+    'Use exactly one of these values for category: "working_well", "needs_work", or "mixed".\n\n'
+    "--- WRITING RULES ---\n"
+    "tagline (slide action title):\n"
+    "  - One complete sentence stating the key takeaway -- what management should know or do.\n"
+    "  - Lead with the conclusion, not the topic label.\n"
+    "    Bad: 'Management and feedback.'\n"
+    "    Good: 'Unclear feedback cycles are quietly stalling team development.'\n"
+    "  - Max 15 words. No hedging adverbs (somewhat, quite, fairly, seems).\n"
+    "summary (Pyramid Principle -- 3 sentences max):\n"
+    "  - Sentence 1: restate the answer directly (the conclusion in one line).\n"
+    "  - Sentence 2: cite 1-2 specific evidence patterns from the responses above.\n"
+    "  - Sentence 3: state the business implication or tension.\n"
+    "  - No filler openers ('The data shows...', 'It appears that...'). State claims directly.\n"
+    "  - If evidence is mixed, sentence 2 must name both directions explicitly.\n"
+    "  - Ground every claim in the cited responses. If only some employees mentioned something,\n"
+    "    say 'some' or 'a few', not 'employees' or 'the team'.\n"
+    "quotes:\n"
+    "  - 2-3 paraphrases, as specific and concrete as possible. Prefer concrete over abstract.\n"
+    "  - Strip filler words ('you know', 'like', 'I mean'). Preserve meaning and anonymity.\n"
+    "tag: 1-2 word theme label e.g. Culture, Development, Wellbeing.\n"
     "Never use em dashes in any text.\n"
     "Return only valid JSON. No other text."
 )
 
 PROMPT_EXPERIMENTS = (
-    "You are an HR consultant reviewing employee interview findings and proposing actionable experiments.\n\n"
+    "You are a senior HR consultant reviewing employee interview findings and proposing actionable experiments.\n\n"
     "Ground each experiment in the specific finding it addresses. Do not overstate the problem "
-    "or promise more than a small experiment can deliver. Write as a practical advisor, not a "
-    "consultant selling a solution. Be specific and concrete -- vague suggestions are not useful.\n\n"
+    "or promise more than a small experiment can deliver. Be specific and concrete -- vague suggestions are not useful.\n\n"
     "Findings that need attention:\n"
     "{findings_text}\n\n"
     "Choose the {max_n} most impactful experiments across all findings above. "
     "Prioritise by likely impact and feasibility within 1-2 weeks.\n\n"
+    "Experiment title rule: imperative verb, plain everyday language, specific, max 10 words. "
+    "No jargon. Example: 'Share the promotion criteria in writing with the team.'\n\n"
     "Return valid JSON:\n"
     '{{"experiments": [\n'
-    '  {{"title": "Short experiment name",\n'
+    '  {{"title": "Imperative-verb title, max 10 words",\n'
     '   "source_cluster": "exact finding name from the list above",\n'
     '   "insight": "1-2 sentences: which finding this addresses and why it matters for that team.",\n'
     '   "try_this": "The concrete action: what to do, how often, who does it. One paragraph.",\n'
@@ -449,22 +464,65 @@ def propose_experiments(needs_attention: list, max_n: int | None = None) -> list
     return parse_json_safe(raw).get("experiments", [])
 
 
+EMOTIONAL_DIMENSIONS = ["satisfaction", "stress", "worry", "trust", "motivation", "fairness"]
+
+PROMPT_DIMENSIONS = (
+    "You are analysing one anonymised employee interview.\n\n"
+    "For each of the 6 emotional dimensions below, decide whether this specific employee "
+    "personally expressed that emotion or concern in their answers.\n\n"
+    "Rules:\n"
+    "  - Score 1 only if the employee directly expresses the emotion in first person.\n"
+    "  - Score 0 if they only report it about others or the organisation in general.\n"
+    "  - Score 0 if the topic is mentioned neutrally with no emotional signal.\n\n"
+    "Dimensions:\n"
+    "  satisfaction: personal fulfilment, enjoyment, or positive engagement with work or team\n"
+    "  stress:       personal pressure, overload, anxiety, or overwhelm\n"
+    "  worry:        personal uncertainty about the future, job security, or direction\n"
+    "  trust:        direct personal expression of trust or distrust in management / colleagues / processes\n"
+    "  motivation:   personal sense of purpose, drive, desire for recognition or growth\n"
+    "  fairness:     personal perception of equal treatment, transparent criteria, or consistent standards\n\n"
+    "Interview Q&A:\n"
+    "{interview_turns}\n\n"
+    'Return only valid JSON: {{"satisfaction":0,"stress":0,"worry":0,"trust":0,"motivation":0,"fairness":0}}\n'
+    "Use 1 for expressed, 0 for not expressed. No other text."
+)
+
+
+def score_dimensions_one_interview(interview_id_prefix: str, qa_entries: list) -> dict:
+    """Score 6 emotional dimensions for one interview. Returns {dim: 0|1}.
+
+    qa_entries: list of (iq_id, question, answer) tuples.
+    """
+    turns = "\n".join(
+        f"[{iq_id}] Q: {question}\n          A: {answer}"
+        for iq_id, question, answer in qa_entries
+    )
+    prompt = PROMPT_DIMENSIONS.format(interview_turns=turns)
+    raw    = call_llm(prompt)
+    result = parse_json_safe(raw)
+    return {d: int(bool(result.get(d, 0))) for d in EMOTIONAL_DIMENSIONS}
+
+
 PROMPT_HEADLINE = (
-    "You are a qualitative researcher writing the opening and closing narrative for an employee insights report.\n\n"
-    "Write as a qualitative researcher presenting findings to a manager. Ground every "
-    "sentence in what the evidence shows. Do not overstate: if findings are mixed, say so. "
-    "Avoid superlatives and categorical statements. Do not paint the picture more positively "
-    "or negatively than the data supports. Tell a clear story -- do not list findings.\n\n"
+    "You are a senior HR consultant writing the opening and closing narrative for a management briefing "
+    "on employee satisfaction. Write in the style of a top-tier strategy consulting firm.\n\n"
+    "Use the SCQA structure across the opening (headline field):\n"
+    "  - Situation (paragraph 1): one grounding sentence setting the context "
+    "(e.g. 'This team of N employees was interviewed about...'). Then 1-2 sentences on the broad picture.\n"
+    "  - Complication (paragraph 2): the key tension or surprise the findings reveal. "
+    "What is most concerning or unexpected?\n"
+    "  - Question + Answer (paragraph 3): state the implicit management question, then give your synthesis "
+    "and main recommendation. Put the answer first -- do not build to it.\n"
+    "Keep paragraphs tight (2-3 sentences each). No superlatives. No filler. "
+    "Do not list findings -- tell a story. Ground every claim in the evidence below.\n\n"
     "Number of employees interviewed: {n_interviews}\n\n"
     "Findings:\n"
     "{findings_text}\n\n"
     "Return valid JSON with exactly two string fields:\n"
-    '  "headline": 2-3 paragraph opening. Give the overall team picture, name any key tensions,\n'
-    "  and frame what follows. Start directly with substance -- no preamble like 'Based on the\n"
-    "  findings'. Separate paragraphs with a newline character.\n"
-    '  "note_to_protect": 1-2 paragraph closing reflection. Identify what is genuinely positive\n'
-    "  in the data and worth protecting. Be specific about what that combination is and why it\n"
-    "  matters. Grounded, not cheerleading.\n\n"
+    '  "headline": 3 paragraphs following the SCQA structure above. '
+    "Separate paragraphs with a newline character.\n"
+    '  "note_to_protect": 1-2 paragraphs identifying what is genuinely positive and specific '
+    "in the data and why it matters. Grounded, not cheerleading.\n\n"
     'Return format: {{"headline": "...", "note_to_protect": "..."}}\n\n'
     "Never use em dashes in any text.\n"
     "Return only valid JSON. No other text."
@@ -613,13 +671,24 @@ APP_CSS = (
     ".rpt-sec{font-size:20px;font-weight:700;margin:32px 0 14px}\n"
     ".rpt-hr{border:none;border-top:1px solid #e8e8e8;margin:24px 0}\n"
     ".rpt-num{font-size:16px;font-weight:700;margin:0 0 4px;color:#111}\n"
-    ".rpt-tagline{font-size:14px;font-weight:600;color:#333;margin-bottom:10px}\n"
+    ".rpt-tagline{font-size:15px;font-weight:700;color:#111;margin-bottom:10px}\n"
     ".rpt-body{font-size:14px;line-height:1.75;color:#444;margin-bottom:8px}\n"
     ".rpt-qlabel{font-size:10px;font-weight:700;text-transform:uppercase;"
     "letter-spacing:.6px;color:#bbb;margin:14px 0 6px}\n"
     ".rpt-quote{font-size:13px;color:#666;font-style:italic;margin-bottom:6px}\n"
     ".rpt-exp-title{font-size:15px;font-weight:700;margin:20px 0 8px}\n"
     ".rpt-intro{font-size:14px;color:#555;margin-bottom:16px}\n"
+    ".rpt-accent-ww{border-left:3px solid #16a34a;padding-left:14px;margin-bottom:18px}\n"
+    ".rpt-accent-nw{border-left:3px solid #dc2626;padding-left:14px;margin-bottom:18px}\n"
+    ".rpt-accent-mx{border-left:3px solid #d97706;padding-left:14px;margin-bottom:18px}\n"
+    ".rpt-pct{display:inline-block;font-size:11px;font-weight:600;color:#fff;"
+    "border-radius:12px;padding:1px 8px;margin-left:8px;vertical-align:middle;opacity:0.85}\n"
+    ".rpt-pct-ww{background:#16a34a}.rpt-pct-nw{background:#dc2626}.rpt-pct-mx{background:#d97706}\n"
+    ".topics-section{margin-bottom:48px}\n"
+    ".topics-section h3{font-size:15px;font-weight:700;margin-bottom:8px;color:#111}\n"
+    ".topics-intro{font-size:13px;color:#666;margin-bottom:16px;line-height:1.6;max-width:640px}\n"
+    ".topics-svg{width:100%;height:auto;display:block}\n"
+    ".radar-wrap{max-width:560px;margin:0 auto}\n"
 )
 
 
@@ -772,20 +841,35 @@ def _ltree(
     return out
 
 
-def _rpt_insight(n: int, name: str, data: dict) -> str:
+def _rpt_insight(n: int, name: str, data: dict, n_iv: int = 0) -> str:
     """Render one numbered insight block in the document-style report tab."""
-    tagline = H(data.get("tagline", ""))
-    summary = H(data.get("summary", ""))
-    quotes  = data.get("quotes", [])
-    ql = "".join(
-        f'<p class="rpt-quote">&ldquo;{H(q)}&rdquo;</p>' for q in quotes
+    tagline  = H(data.get("tagline", ""))
+    summary  = H(data.get("summary", ""))
+    quotes   = data.get("quotes", [])
+    category = data.get("category", "mixed")
+    voice    = data.get("voice_count", 0)
+
+    accent_cls = {"working_well": "rpt-accent-ww", "needs_work": "rpt-accent-nw"}.get(
+        category, "rpt-accent-mx"
     )
+    pct_cls = {"working_well": "rpt-pct-ww", "needs_work": "rpt-pct-nw"}.get(
+        category, "rpt-pct-mx"
+    )
+    pct_val   = round(voice / n_iv * 10) * 10 if n_iv else 0
+    pct_badge = (
+        f'<span class="rpt-pct {pct_cls}">~{pct_val}% of people</span>'
+        if n_iv and voice else ""
+    )
+
+    ql = "".join(f'<p class="rpt-quote">&ldquo;{H(q)}&rdquo;</p>' for q in quotes)
     ql_block = f'<p class="rpt-qlabel">What people said:</p>{ql}' if quotes else ""
     return (
-        f'<h3 class="rpt-num">{n}. {H(name)}</h3>'
+        f'<div class="{accent_cls}">'
+        f'<h3 class="rpt-num">{n}. {H(name)}{pct_badge}</h3>'
         f'<p class="rpt-tagline">{tagline}</p>'
         f'<p class="rpt-body">{summary}</p>'
         f'{ql_block}'
+        f'</div>'
         f'<hr class="rpt-hr">'
     )
 
@@ -808,11 +892,203 @@ def _rpt_exp(n: int, exp: dict) -> str:
     )
 
 
+def _bubble_pane(clusters: dict, lineage: dict, global_store: dict,
+                  interview_store: dict, n_iv: int) -> str:
+    """SVG bubble chart: one circle per L3 code with > 10% interview coverage."""
+    import math, random
+
+    # l3 -> cluster name
+    l3_to_cluster = {}
+    for cname, cdata in clusters.items():
+        for l3c in cdata.get("l3_codes", []):
+            l3_to_cluster[l3c] = cname
+
+    # l2 -> set of interview ids
+    l2_to_ivs: dict = {}
+    for iid, store in interview_store.items():
+        for item in store.get("l2_codes", []):
+            l2_to_ivs.setdefault(item["code"], set()).add(iid)
+
+    # l3 -> interview count
+    l3_to_count: dict = {}
+    for l3item in global_store.get("l3_codes", []):
+        l3c = l3item["code"]
+        ivs: set = set()
+        for l2c in l3item.get("merged_from_l2", []):
+            ivs |= l2_to_ivs.get(l2c, set())
+        l3_to_count[l3c] = len(ivs)
+
+    filtered = [(l3c, cnt) for l3c, cnt in l3_to_count.items()
+                if n_iv and cnt / n_iv > 0.10]
+    if not filtered:
+        return '<p class="topics-intro">No topics met the 10% coverage threshold.</p>'
+
+    counts   = [cnt for _, cnt in filtered]
+    min_cnt  = min(counts)
+    max_cnt  = max(counts)
+    R_MIN, R_MAX = 18, 50
+
+    def _r(cnt: int) -> float:
+        if max_cnt == min_cnt:
+            return (R_MIN + R_MAX) / 2
+        t = math.sqrt((cnt - min_cnt) / (max_cnt - min_cnt))
+        return R_MIN + t * (R_MAX - R_MIN)
+
+    x_bands = {"needs_work": (0.03, 0.28), "mixed": (0.36, 0.62), "working_well": (0.66, 0.93)}
+    colors  = {
+        "working_well": ("#16a34a", "rgba(22,163,74,0.15)"),
+        "needs_work":   ("#dc2626", "rgba(220,38,38,0.15)"),
+        "mixed":        ("#d97706", "rgba(217,119,6,0.15)"),
+    }
+    SVG_W, SVG_H = 900, 340
+
+    rng = random.Random(42)
+    bubbles = []
+    for l3c, cnt in sorted(filtered, key=lambda x: -x[1]):
+        cname = l3_to_cluster.get(l3c, "")
+        cat   = clusters.get(cname, {}).get("category", "mixed")
+        lo, hi = x_bands.get(cat, (0.36, 0.62))
+        cx    = rng.uniform(lo, hi) * SVG_W
+        r     = _r(cnt)
+        pct   = round(cnt / n_iv * 10) * 10
+        stroke, fill = colors.get(cat, ("#888", "rgba(136,136,136,0.15)"))
+        max_chars = max(4, int(r * 2 / 7))
+        label = l3c if len(l3c) <= max_chars else l3c[:max_chars - 1] + "..."
+        bubbles.append({"cx": cx, "r": r, "pct": pct, "label": label,
+                         "stroke": stroke, "fill": fill})
+
+    circle_els = ""
+    for b in bubbles:
+        fs     = max(7, min(13, int(b["r"] * 0.38)))
+        fs_pct = max(6, int(fs * 0.8))
+        cx_s   = f"{b['cx']:.1f}"
+        r_s    = f"{b['r']:.1f}"
+        circle_els += (
+            f'<g data-cx="{cx_s}" data-r="{r_s}" class="bbl">'
+            f'<circle cx="{cx_s}" cy="160" r="{r_s}" '
+            f'fill="{b["fill"]}" stroke="{b["stroke"]}" stroke-width="1.5"/>'
+            f'<text x="{cx_s}" y="160" text-anchor="middle" dominant-baseline="middle" '
+            f'font-size="{fs}" font-family="sans-serif" fill="{b["stroke"]}">'
+            f'{H(b["label"])}'
+            f'<tspan x="{cx_s}" dy="{fs * 1.1:.1f}" font-size="{fs_pct}" fill="#aaa">'
+            f'~{b["pct"]}%</tspan>'
+            f'</text></g>'
+        )
+
+    axis = (
+        f'<line x1="0" y1="305" x2="{SVG_W}" y2="305" stroke="#e5e5e5" stroke-width="1"/>'
+        '<text x="28" y="320" font-size="10" font-family="sans-serif" fill="#dc2626">Needs Work</text>'
+        '<text x="450" y="320" font-size="10" font-family="sans-serif" fill="#d97706" '
+        'text-anchor="middle">Mixed Signals</text>'
+        f'<text x="{SVG_W - 28}" y="320" font-size="10" font-family="sans-serif" '
+        'fill="#16a34a" text-anchor="end">Working Well</text>'
+    )
+
+    js = (
+        "(function(){"
+        "var gs=document.querySelectorAll('.bbl'),placed=[];"
+        "gs.forEach(function(g){"
+        "var cx=parseFloat(g.dataset.cx),r=parseFloat(g.dataset.r),cy=155;"
+        "for(var att=0;att<18;att++){"
+        "var ok=true;"
+        "for(var i=0;i<placed.length;i++){"
+        "var dx=cx-placed[i][0],dy=cy-placed[i][1];"
+        "if(Math.sqrt(dx*dx+dy*dy)<r+placed[i][2]+5){ok=false;break;}"
+        "}"
+        "if(ok)break;"
+        "cy+=(att%2===0?1:-1)*Math.ceil((att+1)/2)*(r*0.85);"
+        "cy=Math.max(r+10,Math.min(295-r,cy));}"
+        "placed.push([cx,cy,r]);"
+        "var c=g.querySelector('circle');c.setAttribute('cy',cy);"
+        "var t=g.querySelector('text');t.setAttribute('y',cy);"
+        "var ts=g.querySelector('tspan');if(ts)ts.setAttribute('x',cx);});"
+        "})();"
+    )
+
+    return (
+        f'<svg viewBox="0 0 {SVG_W} {SVG_H}" class="topics-svg">'
+        f'{circle_els}{axis}</svg>'
+        f'<script>{js}</script>'
+    )
+
+
+def _radar_pane(dimension_store: dict, n_iv: int) -> str:
+    """SVG radar chart for 6 emotional dimensions. Returns empty-state message if data missing."""
+    import math
+
+    total = dimension_store.get("_total", {})
+    if not total or not n_iv:
+        return (
+            '<p class="topics-intro" style="color:#bbb;font-style:italic;">'
+            'Emotional dimension data not yet available. Run C9c in Pipeline_Execution.ipynb first.</p>'
+        )
+
+    CX, CY, R = 300, 250, 175
+    LABEL_R   = R + 28
+    RINGS     = [20, 40, 60, 80, 100]
+    DIM_LABELS = ["Satisfaction", "Stress", "Worry", "Trust", "Motivation", "Fairness"]
+    anchors   = ["middle", "start", "start", "middle", "end", "end"]
+    dy_extra  = [-6, 4, 4, 16, 4, 4]
+
+    scores = [total.get(d, 0) / n_iv for d in EMOTIONAL_DIMENSIONS]
+
+    out = '<svg viewBox="0 0 600 500" class="topics-svg">\n'
+
+    # Concentric rings
+    for pct in RINGS:
+        ring_r = pct / 100 * R
+        out += (
+            f'<circle cx="{CX}" cy="{CY}" r="{ring_r:.1f}" '
+            f'fill="none" stroke="#e5e5e5" stroke-width="1"/>\n'
+            f'<text x="{CX + ring_r + 3:.1f}" y="{CY + 4}" '
+            f'font-size="9" fill="#ccc" font-family="sans-serif">{pct}%</text>\n'
+        )
+
+    # Axes and labels
+    for i, dim in enumerate(EMOTIONAL_DIMENSIONS):
+        angle = math.radians(-90 + i * 60)
+        ax = CX + R * math.cos(angle)
+        ay = CY + R * math.sin(angle)
+        out += (
+            f'<line x1="{CX}" y1="{CY}" x2="{ax:.1f}" y2="{ay:.1f}" '
+            f'stroke="#d5d5d5" stroke-width="1"/>\n'
+        )
+        lx = CX + LABEL_R * math.cos(angle)
+        ly = CY + LABEL_R * math.sin(angle) + dy_extra[i]
+        label_color = "#16a34a" if scores[i] >= 0.5 else "#555"
+        out += (
+            f'<text x="{lx:.1f}" y="{ly:.1f}" text-anchor="{anchors[i]}" '
+            f'font-size="11" font-family="sans-serif" fill="{label_color}" font-weight="500">'
+            f'{DIM_LABELS[i]}</text>\n'
+        )
+
+    # Filled polygon
+    poly_pts = []
+    for i in range(len(EMOTIONAL_DIMENSIONS)):
+        angle = math.radians(-90 + i * 60)
+        dist  = scores[i] * R
+        poly_pts.append((CX + dist * math.cos(angle), CY + dist * math.sin(angle)))
+
+    pts_str = " ".join(f"{x:.1f},{y:.1f}" for x, y in poly_pts)
+    out += (
+        f'<polygon points="{pts_str}" fill="rgba(79,142,247,0.15)" '
+        f'stroke="#4f8ef7" stroke-width="2"/>\n'
+    )
+
+    # Vertex dots
+    for px, py in poly_pts:
+        out += f'<circle cx="{px:.1f}" cy="{py:.1f}" r="4" fill="#4f8ef7"/>\n'
+
+    out += '</svg>\n'
+    return out
+
+
 def build_report_html(
-    clusters: dict, interviews: list, experiments: list,
-    global_store: dict, interview_store: dict, lineage: dict, db: dict
+    clusters: dict, n_iv: int, experiments: list,
+    global_store: dict, interview_store: dict, lineage: dict, db: dict,
+    dimension_store: dict | None = None,
 ) -> str:
-    """Build the full standalone HTML web app (C13). Returns complete HTML string."""
+    """Build the full standalone HTML web app. Returns complete HTML string."""
     logo_candidates = ["spradley_logo.png", "spradley_logo.svg", "logo.png", "logo.svg"]
     logo_file = next(
         (f for f in logo_candidates if os.path.exists(os.path.join("assets", f))),
@@ -823,7 +1099,6 @@ def build_report_html(
         if logo_file else '<div class="logo">SP</div>'
     )
 
-    n_iv     = len(interviews)
     n_themes = len(clusters)
     date_str = datetime.datetime.now().strftime("%B %Y")
 
@@ -853,7 +1128,7 @@ def build_report_html(
     if ordered:
         report += f'<h2 class="rpt-sec">Insights</h2><hr class="rpt-hr">'
         for idx, (name, d) in enumerate(ordered, 1):
-            report += _rpt_insight(idx, name, d)
+            report += _rpt_insight(idx, name, d, n_iv)
 
     # Experiments
     if experiments:
@@ -896,6 +1171,23 @@ def build_report_html(
         + _ltree(lineage, clusters, global_store, interview_store, db)
     )
 
+    topics_tab = (
+        '<div class="topics-section">'
+        '<h3>Sentiment Dimensions</h3>'
+        '<p class="topics-intro">Share of participants who directly expressed each dimension '
+        'in their own words. Based on individual interview scoring -- only first-person '
+        'expression counts.</p>'
+        '<div class="radar-wrap">' + _radar_pane(dimension_store or {}, n_iv) + '</div>'
+        '</div>'
+        '<div class="topics-section">'
+        '<h3>Topic Map</h3>'
+        '<p class="topics-intro">Each bubble is a recurring sub-theme mentioned by more than '
+        '10% of participants. Size reflects mention frequency. Position shows sentiment: '
+        'left needs attention, right is working well.</p>'
+        + _bubble_pane(clusters, lineage, global_store, interview_store, n_iv) +
+        '</div>'
+    )
+
     meta = H(f"Spradley · {len(clusters)} themes · {n_iv} interviews")
     js = (
         "function showTab(name,btn){"
@@ -920,10 +1212,12 @@ def build_report_html(
         "  </div>\n"
         "  <nav class=\"tabs\">\n"
         "    <button class=\"tab-btn active\" onclick=\"showTab('report',this)\">Report</button>\n"
+        "    <button class=\"tab-btn\" onclick=\"showTab('topics',this)\">Topics</button>\n"
         "    <button class=\"tab-btn\" onclick=\"showTab('lineage',this)\">Data Lineage</button>\n"
         "  </nav>\n"
         "</header>\n\n"
         "<div id=\"pane-report\" class=\"tab-pane active\">\n" + report + "\n</div>\n\n"
+        "<div id=\"pane-topics\" class=\"tab-pane\">\n" + topics_tab + "\n</div>\n\n"
         "<div id=\"pane-lineage\" class=\"tab-pane\">\n" + lineage_tab + "\n</div>\n\n"
         "<script>\n" + js + "\n</script>\n\n"
         "</body>\n</html>"
