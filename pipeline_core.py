@@ -1261,9 +1261,10 @@ def _bubble_pane(clusters: dict, lineage: dict, global_store: dict,
     )
 
 
-def _radar_pane(dimension_store: dict, n_iv: int) -> str:
+def _radar_pane(dimension_store: dict, n_iv: int, db: dict | None = None) -> str:
     """SVG radar chart for 6 emotional dimensions with hover tooltips."""
     import math, json as _json
+    from collections import defaultdict as _dd
 
     total = dimension_store.get("_total", {})
     if not total or not n_iv:
@@ -1271,6 +1272,18 @@ def _radar_pane(dimension_store: dict, n_iv: int) -> str:
             '<p class="topics-intro" style="color:#bbb;font-style:italic;">'
             'Emotional dimension data not yet available. Run C9c in Pipeline_Execution.ipynb first.</p>'
         )
+
+    # Use completed-only totals when available (stored by C9c)
+    total_completed = dimension_store.get("_total_completed", {})
+    n_completed     = total_completed.get("interviews", 0)
+    if n_completed > 0:
+        use_total   = total_completed
+        n_display   = n_completed
+        caption_sfx = f"Completed interviews only (n={n_completed}). Exact % who expressed each dimension."
+    else:
+        use_total   = total
+        n_display   = n_iv
+        caption_sfx = f"All interviews (n={n_iv}). Exact % who expressed each dimension."
 
     CX, CY, R = 300, 255, 175
     LABEL_R    = R + 30
@@ -1287,7 +1300,40 @@ def _radar_pane(dimension_store: dict, n_iv: int) -> str:
     anchors  = ["middle", "start", "start", "middle", "end", "end"]
     dy_extra = [-8, 4, 4, 18, 4, 4]
 
-    scores = [total.get(d, 0) / n_iv for d in EMOTIONAL_DIMENSIONS]
+    scores = [use_total.get(d, 0) / n_display for d in EMOTIONAL_DIMENSIONS]
+
+    # Build Q&A samples for hover tooltip: up to 3 completed interviews per dimension
+    samples: dict = {d: [] for d in EMOTIONAL_DIMENSIONS}
+    if db:
+        by_iv_db: dict = _dd(list)
+        for entry in db.values():
+            by_iv_db[entry["interview_id"]].append({
+                "q": entry.get("question", ""),
+                "a": entry.get("anonymised_answer", ""),
+            })
+        for dim in EMOTIONAL_DIMENSIONS:
+            candidates = [
+                k for k, v in dimension_store.items()
+                if not k.startswith("_")
+                and v.get(dim) == 1
+                and v.get("_status", "") == "completed"
+            ]
+            # fallback: any interview that scored 1 if no completed ones
+            if not candidates:
+                candidates = [
+                    k for k, v in dimension_store.items()
+                    if not k.startswith("_") and v.get(dim) == 1
+                ]
+            for iv_id in candidates[:5]:
+                if len(samples[dim]) >= 3:
+                    break
+                qa_list = by_iv_db.get(iv_id, [])
+                for qa in qa_list:
+                    if qa["a"].strip():
+                        q_text = (qa["q"][:90] + "...") if len(qa["q"]) > 90 else qa["q"]
+                        a_text = (qa["a"][:180] + "...") if len(qa["a"]) > 180 else qa["a"]
+                        samples[dim].append({"q": q_text, "a": a_text})
+                        break
 
     out = '<svg viewBox="0 0 600 510" class="topics-svg" id="radar-svg">\n'
 
@@ -1343,11 +1389,11 @@ def _radar_pane(dimension_store: dict, n_iv: int) -> str:
         ann_off = 14
         ann_x   = CX + (scores[i] * R + ann_off) * math.cos(angle)
         ann_y   = CY + (scores[i] * R + ann_off) * math.sin(angle)
-        pct_val = round(scores[i] * 10) * 10
+        pct_val = round(scores[i] * 100)
         out += (
             f'<text x="{ann_x:.1f}" y="{ann_y + 4:.1f}" text-anchor="middle" '
             f'font-size="10" font-family="Arial,sans-serif" fill="#4f8ef7" font-weight="600">'
-            f'~{pct_val}%</text>\n'
+            f'{pct_val}%</text>\n'
         )
 
     # Invisible hit elements -- rendered last so they sit on top of the polygon fill
@@ -1370,19 +1416,21 @@ def _radar_pane(dimension_store: dict, n_iv: int) -> str:
     out += (
         f'<text x="{CX}" y="498" text-anchor="middle" font-size="9" '
         f'font-family="Arial,sans-serif" fill="#ccc">'
-        f'Blue area shows share of participants who directly expressed each dimension.</text>\n'
+        f'{caption_sfx}</text>\n'
     )
 
     out += '</svg>\n'
 
-    # Build dimension data for JS tooltip
+    # Build dimension data for JS tooltip (exact pct + Q&A samples)
     dim_data = {}
     for i, dim in enumerate(EMOTIONAL_DIMENSIONS):
-        pct_val = round(scores[i] * 10) * 10
+        pct_val = round(scores[i] * 100)
         dim_data[dim] = {
-            "label": DIM_LABELS[i],
-            "pct":   pct_val,
-            "def":   DIM_DEFS[dim],
+            "label":   DIM_LABELS[i],
+            "pct":     pct_val,
+            "n":       n_display,
+            "def":     DIM_DEFS[dim],
+            "samples": samples.get(dim, []),
         }
 
     js = (
@@ -1398,8 +1446,15 @@ def _radar_pane(dimension_store: dict, n_iv: int) -> str:
         "var d=DIM[el.dataset.dim];if(!d)return;"
         "var h='';"
         "h+='<div style=\"font-weight:700;font-size:14px;margin-bottom:3px\">'+d.label+'</div>';"
-        "h+='<div style=\"font-size:15px;font-weight:700;color:#4f8ef7;margin-bottom:6px\">~'+d.pct+'% of participants</div>';"
-        "h+='<div style=\"font-size:11px;color:#94a3b8;border-top:1px solid #334155;padding-top:6px\">'+d.def+'</div>';"
+        "h+='<div style=\"font-size:15px;font-weight:700;color:#4f8ef7;margin-bottom:6px\">'+d.pct+'% of '+d.n+' interviews</div>';"
+        "h+='<div style=\"font-size:11px;color:#94a3b8;padding-bottom:8px\">'+d.def+'</div>';"
+        "if(d.samples&&d.samples.length){"
+        "h+='<div style=\"font-size:11px;font-weight:600;color:#64748b;border-top:1px solid #334155;padding-top:8px;margin-bottom:6px\">Sample responses:</div>';"
+        "d.samples.forEach(function(s,i){"
+        "if(i>0)h+='<div style=\"border-top:1px solid #1e293b;margin:8px 0\"></div>';"
+        "h+='<div style=\"font-size:11px;color:#64748b;font-style:italic\">Q: '+s.q+'</div>';"
+        "h+='<div style=\"font-size:12px;color:#e2e8f0;margin-top:3px\">'+s.a+'</div>';"
+        "});}"
         "tip.innerHTML=h;tip.style.display='block';"
         "});"
         "el.addEventListener('mousemove',function(e){"
@@ -1622,7 +1677,7 @@ def build_report_html(
         '<p class="topics-intro">Share of visitors who directly expressed each attitude '
         'in their own words. Based on individual interview scoring -- only first-person '
         'expression counts.</p>'
-        '<div class="radar-wrap">' + _radar_pane(dimension_store or {}, n_iv) + '</div>'
+        '<div class="radar-wrap">' + _radar_pane(dimension_store or {}, n_iv, db=db) + '</div>'
         '</div>'
         '<div class="topics-section">'
         '<h3>Topic Map</h3>'
