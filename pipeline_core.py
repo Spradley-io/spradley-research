@@ -155,6 +155,8 @@ def _parse_spradley_v2(df: "pd.DataFrame") -> list:
     interviews = []
     for interview_id, group in df.groupby("employee_id"):
         group    = group.sort_values(["thread", "turn_index"])
+        # participant_status is consistent per session -- take the first row's value
+        status   = str(group["participant_status"].iloc[0]) if "participant_status" in group.columns else ""
         qa_pairs = []
         for turn_number, (_, row) in enumerate(group.iterrows(), start=1):
             qa_pairs.append({
@@ -163,7 +165,11 @@ def _parse_spradley_v2(df: "pd.DataFrame") -> list:
                 "answer":      str(row["answer_text"]),
             })
         if qa_pairs:
-            interviews.append({"interview_id": str(interview_id), "qa_pairs": qa_pairs})
+            interviews.append({
+                "interview_id":       str(interview_id),
+                "participant_status": status,
+                "qa_pairs":           qa_pairs,
+            })
     return interviews
 
 
