@@ -536,10 +536,12 @@ PROMPT_HEADLINE = (
     "  - Sentence 1: the single most important pattern in what employees report. "
     "Frame it as what employees experience, feel, or say -- not as a judgement of management behavior. "
     "State it as a factual observation from the data.\n"
-    "  - Sentence 2: the one action priority this data points to. "
-    "Frame it as a recommendation or opportunity, not a command. "
-    "Use 'should', 'could', or 'the priority is' -- never 'must', 'immediately', or 'withholding'.\n\n"
-    "Rules: No scene-setting. No listing of findings. "
+    "  - Sentence 2: the key organisational consequence this pattern creates. "
+    "State what the data shows is happening as a result -- what it means for trust, focus, or team stability. "
+    "This is an observed impact, not a recommendation. Never suggest what anyone should do.\n\n"
+    "Rules: No recommendations, priorities, or suggested actions of any kind. "
+    "This is a diagnostic statement -- what the data shows, and what effect it has. "
+    "No scene-setting. No listing of findings. "
     "The detailed findings are in the report below -- this is the elevator pitch only. "
     "Never attribute blame or negative motive to managers. "
     "Write in short declarative sentences under 25 words each. "
@@ -951,13 +953,16 @@ def _bubble_pane(clusters: dict, lineage: dict, global_store: dict,
     MAX_BUBBLES = 16
     ZONE_MAX    = 6
 
-    # Group all topics by zone category
+    # Group all topics by zone category; skip any L3 code not assigned to a cluster
+    # (unassigned codes can't cross-reference the Report tab and produce empty tooltips)
     all_by_cat: dict = {"needs_work": [], "mixed": [], "working_well": []}
     for l3c, cnt in l3_to_count.items():
         if not cnt:
             continue
         cname = l3_to_cluster.get(l3c, "")
-        cat   = clusters.get(cname, {}).get("category", "mixed")
+        if not cname:
+            continue
+        cat = clusters.get(cname, {}).get("category", "mixed")
         all_by_cat[cat].append((l3c, cnt))
 
     if not any(all_by_cat.values()):
