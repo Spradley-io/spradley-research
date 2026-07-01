@@ -1330,16 +1330,20 @@ def _radar_pane(dimension_store: dict, n_iv: int, db: dict | None = None) -> str
                     k for k, v in dimension_store.items()
                     if not k.startswith("_") and v.get(dim) == 1
                 ]
-            for iv_id in candidates[:5]:
+            for iv_id in candidates[:8]:
                 if len(samples[dim]) >= 3:
                     break
                 qa_list = by_iv_db.get(iv_id, [])
-                for qa in qa_list:
-                    if qa["a"].strip():
-                        q_text = (qa["q"][:90] + "...") if len(qa["q"]) > 90 else qa["q"]
-                        a_text = (qa["a"][:180] + "...") if len(qa["a"]) > 180 else qa["a"]
-                        samples[dim].append({"q": q_text, "a": a_text})
-                        break
+                # pick the answer with the most substance (longest stripped text)
+                best = max(
+                    (qa for qa in qa_list if qa["a"].strip()),
+                    key=lambda qa: len(qa["a"]),
+                    default=None,
+                )
+                if best:
+                    q_text = (best["q"][:90] + "...") if len(best["q"]) > 90 else best["q"]
+                    a_text = (best["a"][:180] + "...") if len(best["a"]) > 180 else best["a"]
+                    samples[dim].append({"q": q_text, "a": a_text})
 
     out = '<svg viewBox="0 0 600 510" class="topics-svg" id="radar-svg">\n'
 
